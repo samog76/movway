@@ -41,6 +41,18 @@ export const searchMulti = (query: string) => tmdb<TmdbList>("/search/multi", { 
 export const getMovieDetails = (id: number) => tmdb<Movie & { genres: { id: number; name: string }[]; runtime: number }>(`/movie/${id}`);
 export const getTVDetails = (id: number) => tmdb<Movie & { genres: { id: number; name: string }[]; number_of_seasons: number }>(`/tv/${id}`);
 
+export interface CastMember {
+  id: number;
+  name: string;
+  character: string;
+  profile_path: string | null;
+}
+
+export interface Credits { cast: CastMember[] }
+
+export const getMovieCredits = (id: number) => tmdb<Credits>(`/movie/${id}/credits`);
+export const getTVCredits = (id: number) => tmdb<Credits>(`/tv/${id}/credits`);
+
 export const playerUrl = {
   movie: (tmdbId: number) => `https://vidsrc-embed.ru/embed/movie/${tmdbId}`,
   tv: (tmdbId: number, season: number, episode: number) =>

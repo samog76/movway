@@ -1,6 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { getMovieDetails, getTVDetails, playerUrl, backdrop } from "@/lib/tmdb";
+import { getMovieDetails, getTVDetails, getMovieCredits, getTVCredits, playerUrl, backdrop, img } from "@/lib/tmdb";
 import { upsertWatchEntry } from "@/lib/continueWatching";
 import { ArrowLeft, Star } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -17,6 +17,13 @@ export default function WatchPage() {
       return getMovieDetails(tmdbId) as Promise<any>;
     },
   });
+
+  const { data: credits } = useQuery({
+    queryKey: ["credits", type, tmdbId],
+    queryFn: () => isTV ? getTVCredits(tmdbId) : getMovieCredits(tmdbId),
+  });
+
+  const cast = credits?.cast?.slice(0, 12) ?? [];
 
   const [season, setSeason] = useState(1);
   const [episode, setEpisode] = useState(1);
@@ -107,6 +114,36 @@ export default function WatchPage() {
           </div>
         </div>
       )}
+
+      {cast.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="font-display text-base font-semibold">Cast</h2>
+          <div className="flex flex-wrap gap-4">
+            {cast.map((member) => (
+              <div key={member.id} className="flex items-center gap-3 bg-secondary rounded-xl px-3 py-2 min-w-[160px]">
+                {member.profile_path ? (
+                  <img
+                    src={img(member.profile_path, "w92")}
+                    alt={member.name}
+                    className="w-10 h-10 rounded-full object-cover shrink-0"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-xs shrink-0">
+                    {member.name.charAt(0)}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{member.name}</p>
+                  {member.character && (
+                    <p className="text-xs text-muted-foreground truncate">{member.character}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
