@@ -3,7 +3,9 @@ const BASE = "https://api.themoviedb.org/3";
 const IMG = "https://image.tmdb.org/t/p";
 
 export const img = (path: string | null, size = "w500") =>
-  path ? `${IMG}/${size}${path}` : "/placeholder.svg";
+  path
+    ? `${IMG}/${size}${path}`
+    : "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
 export const backdrop = (path: string | null) => img(path, "original");
 
