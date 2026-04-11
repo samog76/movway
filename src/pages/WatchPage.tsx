@@ -1,8 +1,9 @@
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getMovieDetails, getTVDetails, playerUrl, backdrop } from "@/lib/tmdb";
+import { upsertWatchEntry } from "@/lib/continueWatching";
 import { ArrowLeft, Star } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function WatchPage() {
   const { type, id } = useParams<{ type: string; id: string }>();
@@ -19,6 +20,23 @@ export default function WatchPage() {
 
   const [season, setSeason] = useState(1);
   const [episode, setEpisode] = useState(1);
+
+  useEffect(() => {
+    if (!movie) return;
+    upsertWatchEntry({
+      id: tmdbId,
+      title: movie.title,
+      name: movie.name,
+      overview: movie.overview,
+      poster_path: movie.poster_path,
+      backdrop_path: movie.backdrop_path,
+      vote_average: movie.vote_average,
+      media_type: isTV ? "tv" : "movie",
+      release_date: movie.release_date,
+      first_air_date: movie.first_air_date,
+      ...(isTV ? { season, episode } : {}),
+    });
+  }, [movie, season, episode, tmdbId, isTV]);
 
   const embedUrl = isTV
     ? playerUrl.tv(tmdbId, season, episode)

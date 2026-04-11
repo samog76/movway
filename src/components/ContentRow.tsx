@@ -7,9 +7,10 @@ interface Props {
   title: string;
   items: Movie[];
   showDelete?: boolean;
+  onDelete?: (item: Movie) => void;
 }
 
-export default function ContentRow({ title, items, showDelete }: Props) {
+export default function ContentRow({ title, items, showDelete, onDelete }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const scroll = (dir: number) => {
@@ -71,7 +72,7 @@ export default function ContentRow({ title, items, showDelete }: Props) {
                     className="absolute top-2 right-2 p-2 rounded-md bg-destructive/90 text-white opacity-0 group-hover/card:opacity-100 transition-opacity"
                     onClick={(e) => {
                       e.preventDefault();
-                      // Add your delete logic here
+                      onDelete?.(item);
                     }}
                   >
                     <Trash2 size={14} />
