@@ -8,6 +8,7 @@ import NotFound from "./pages/NotFound.tsx";
 import AppLayout from "@/components/AppLayout";
 import SearchPage from "./pages/SearchPage";
 import WatchPage from "./pages/WatchPage";
+import BrowsePage from "./pages/BrowsePage";
 
 const queryClient = new QueryClient();
 
@@ -21,7 +22,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/search" element={<AppLayout><SearchPage /></AppLayout>} />
           <Route path="/watch/:type/:id" element={<AppLayout><WatchPage /></AppLayout>} />
-          <Route path="/browse/:category" element={<Index />} />
+          <Route path="/browse/:category" element={<AppLayout><BrowsePage /></AppLayout>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

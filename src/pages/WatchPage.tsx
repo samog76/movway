@@ -8,6 +8,8 @@ import { useState, useEffect } from "react";
 export default function WatchPage() {
   const { type, id } = useParams<{ type: string; id: string }>();
   const tmdbId = Number(id);
+  // Normalize type: anything other than "tv" is treated as "movie" to ensure
+  // the correct TMDB details and credits endpoints are always called.
   const isTV = type === "tv";
 
   const { data: movie } = useQuery({

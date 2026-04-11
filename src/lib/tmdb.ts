@@ -37,6 +37,7 @@ export const getTopRated = () => tmdb<TmdbList>("/movie/top_rated");
 export const getPopularTV = () => tmdb<TmdbList>("/tv/popular");
 export const getUpcoming = () => tmdb<TmdbList>("/movie/upcoming");
 export const searchMulti = (query: string) => tmdb<TmdbList>("/search/multi", { query });
+export const getAnime = () => tmdb<TmdbList>("/discover/tv", { with_genres: "16" });
 
 export const getMovieDetails = (id: number) => tmdb<Movie & { genres: { id: number; name: string }[]; runtime: number }>(`/movie/${id}`);
 export const getTVDetails = (id: number) => tmdb<Movie & { genres: { id: number; name: string }[]; number_of_seasons: number }>(`/tv/${id}`);

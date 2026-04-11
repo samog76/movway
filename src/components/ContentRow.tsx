@@ -45,7 +45,7 @@ export default function ContentRow({ title, items, showDelete, onDelete }: Props
         className="flex gap-4 overflow-x-auto scrollbar-hide pb-4 snap-x snap-mandatory touch-pan-x"
       >
         {items.map((item) => {
-          const type = item.media_type === "tv" || item.first_air_date ? "tv" : "movie";
+          const type = item.media_type === "tv" || item.first_air_date || (item.name && !item.title) ? "tv" : "movie";
           return (
             <Link
               key={item.id}
