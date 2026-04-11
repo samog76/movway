@@ -45,6 +45,18 @@ export const playerUrl = {
   movie: (tmdbId: number) => `https://vidsrc-embed.ru/embed/movie/${tmdbId}`,
   tv: (tmdbId: number, season: number, episode: number) =>
     `https://vidsrc-embed.ru/embed/tv/${tmdbId}/${season}/${episode}`,
-  anime: (anilistId: number, ep: number, dub = false) =>
-    `https://player.vidplus.to/embed/anime/${anilistId}/${ep}?dub=${dub}`,
+};
+
+const ensurePageNumber = (page: number) => {
+  if (!Number.isInteger(page) || page < 1) {
+    throw new Error("Page number is required and must be a positive integer");
+  }
+  return page;
+};
+
+export const latestListUrl = {
+  tvShows: (page: number) =>
+    `https://vidsrc-embed.ru/movies/latest/page-${ensurePageNumber(page)}.json`,
+  episodes: (page: number) =>
+    `https://vidsrc-embed.ru/episodes/latest/page-${ensurePageNumber(page)}.json`,
 };
