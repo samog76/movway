@@ -85,3 +85,9 @@
     display: none;
   }
 }
+
+/* Prevent horizontal overflow at the root level */
+html, body {
+  overflow-x: hidden;
+  max-width: 100%;
+}

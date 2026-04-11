@@ -47,8 +47,8 @@ export default function WatchPage() {
       {movie && (
         <div className="flex gap-6">
           <div className="flex-1 space-y-3">
-            <h1 className="font-display text-3xl font-bold">{title}</h1>
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <h1 className="font-display text-xl md:text-3xl font-bold">{title}</h1>
+            <div className="flex flex-wrap items-center gap-2 md:gap-4 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Star size={14} className="text-primary fill-primary" />
                 {movie.vote_average.toFixed(1)}
@@ -61,7 +61,7 @@ export default function WatchPage() {
             <p className="text-muted-foreground text-sm leading-relaxed max-w-3xl">{movie.overview}</p>
 
             {isTV && (
-              <div className="flex items-center gap-4 pt-2">
+              <div className="flex flex-wrap items-center gap-4 pt-2">
                 <label className="flex items-center gap-2 text-sm">
                   Season
                   <select

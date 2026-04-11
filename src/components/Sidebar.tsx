@@ -1,5 +1,4 @@
 import { Home, Search, Film, Tv, Sparkles, BookOpen, Music, Radio, Heart, Clock, ChevronLeft, ChevronRight } from "lucide-react";
-import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 const navItems = [
@@ -18,20 +17,30 @@ const mediaItems = [
   { icon: Clock, label: "History", path: "/history" },
 ];
 
-export default function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+interface SidebarProps {
+  collapsed: boolean;
+  setCollapsed: (c: boolean) => void;
+  mobileOpen: boolean;
+  onMobileClose: () => void;
+}
+
+export default function Sidebar({ collapsed, setCollapsed, mobileOpen, onMobileClose }: SidebarProps) {
   const { pathname } = useLocation();
 
   return (
     <aside
       className={`fixed left-0 top-0 h-screen z-40 flex flex-col border-r border-border transition-all duration-300 ${
         collapsed ? "w-[72px]" : "w-[240px]"
-      }`}
+      } ${mobileOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
       style={{ background: "hsl(var(--sidebar-bg))" }}
     >
       <div className="flex items-center justify-between px-5 py-6">
         {!collapsed && (
-          <Link to="/" className="font-display text-2xl font-bold tracking-tight text-foreground">
+          <Link
+            to="/"
+            onClick={onMobileClose}
+            className="font-display text-2xl font-bold tracking-tight text-foreground"
+          >
             Mov<span className="text-primary">way</span>
           </Link>
         )}
@@ -43,13 +52,14 @@ export default function Sidebar() {
         </button>
       </div>
 
-      <nav className="flex-1 px-3 space-y-1">
+      <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
           const active = pathname === item.path;
           return (
             <Link
               key={item.path}
               to={item.path}
+              onClick={onMobileClose}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 active
                   ? "bg-primary/10 text-primary"
@@ -75,6 +85,7 @@ export default function Sidebar() {
             <Link
               key={item.path}
               to={item.path}
+              onClick={onMobileClose}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 active
                   ? "bg-primary/10 text-primary"
