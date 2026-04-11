@@ -55,6 +55,8 @@ const ensurePageNumber = (page: number) => {
 };
 
 export const latestListUrl = {
+  movies: (page: number) =>
+    `https://vidsrc-embed.ru/movies/latest/page-${ensurePageNumber(page)}.json`,
   tvShows: (page: number) =>
     `https://vidsrc-embed.ru/movies/latest/page-${ensurePageNumber(page)}.json`,
   episodes: (page: number) =>
