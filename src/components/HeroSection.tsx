@@ -10,7 +10,7 @@ export default function HeroSection({ movie }: Props) {
   if (!movie) return <div className="h-[220px] sm:h-[340px] md:h-[450px] bg-card rounded-2xl animate-pulse" />;
 
   const title = movie.title || movie.name || "";
-  const type = movie.media_type === "tv" ? "tv" : "movie";
+  const type = movie.media_type === "tv" || movie.first_air_date || (movie.name && !movie.title) ? "tv" : "movie";
 
   return (
     <div className="relative h-[220px] sm:h-[340px] md:h-[450px] rounded-2xl overflow-hidden group">
