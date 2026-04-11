@@ -42,9 +42,9 @@ export const getMovieDetails = (id: number) => tmdb<Movie & { genres: { id: numb
 export const getTVDetails = (id: number) => tmdb<Movie & { genres: { id: number; name: string }[]; number_of_seasons: number }>(`/tv/${id}`);
 
 export const playerUrl = {
-  movie: (tmdbId: number) => `https://player.vidplus.to/embed/movie/${tmdbId}`,
+  movie: (tmdbId: number) => `https://vidsrc-embed.ru/embed/movie/${tmdbId}`,
   tv: (tmdbId: number, season: number, episode: number) =>
-    `https://player.vidplus.to/embed/tv/${tmdbId}/${season}/${episode}`,
+    `https://vidsrc-embed.ru/embed/tv/${tmdbId}/${season}/${episode}`,
   anime: (anilistId: number, ep: number, dub = false) =>
     `https://player.vidplus.to/embed/anime/${anilistId}/${ep}?dub=${dub}`,
 };
