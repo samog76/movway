@@ -10,7 +10,13 @@ import SearchPage from "./pages/SearchPage";
 import WatchPage from "./pages/WatchPage";
 import BrowsePage from "./pages/BrowsePage";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
