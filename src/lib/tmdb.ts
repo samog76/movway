@@ -1,4 +1,6 @@
-const TMDB_API_KEY = "2dca580c2a14b55200e784d157207b4d";
+const TMDB_API_KEY =
+  (import.meta.env.VITE_TMDB_API_KEY as string | undefined) ||
+  "2dca580c2a14b55200e784d157207b4d";
 const BASE = "https://api.themoviedb.org/3";
 const IMG = "https://image.tmdb.org/t/p";
 const DEFAULT_IMAGE = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
@@ -35,6 +37,8 @@ export interface Movie {
 interface TmdbList { results: Movie[]; }
 
 export const getTrending = () => tmdb<TmdbList>("/trending/all/week");
+export const getTrendingMovies = () => tmdb<TmdbList>("/trending/movie/week");
+export const getTrendingTV = () => tmdb<TmdbList>("/trending/tv/week");
 export const getPopularMovies = () => tmdb<TmdbList>("/movie/popular");
 export const getTopRated = () => tmdb<TmdbList>("/movie/top_rated");
 export const getPopularTV = () => tmdb<TmdbList>("/tv/popular");
