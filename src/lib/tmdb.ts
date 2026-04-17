@@ -62,9 +62,9 @@ export const getMovieCredits = (id: number) => tmdb<Credits>(`/movie/${id}/credi
 export const getTVCredits = (id: number) => tmdb<Credits>(`/tv/${id}/credits`);
 
 export const playerUrl = {
-  movie: (tmdbId: number) => `https://vidsrc-embed.ru/embed/movie/${tmdbId}`,
+  movie: (tmdbId: number) => `https://player.vidplus.to/embed/movie/${tmdbId}`,
   tv: (tmdbId: number, season: number, episode: number) =>
-    `https://vidsrc-embed.ru/embed/tv/${tmdbId}/${season}/${episode}`,
+    `https://player.vidplus.to/embed/tv/${tmdbId}/${season}/${episode}`,
   anime: (anilistId: number, ep: number, dub = false) =>
     `https://player.vidplus.to/embed/anime/${anilistId}/${ep}?dub=${dub}`,
 };
