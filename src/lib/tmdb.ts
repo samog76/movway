@@ -3,7 +3,17 @@ const TMDB_API_KEY =
   "2dca580c2a14b55200e784d157207b4d";
 const BASE = "https://api.themoviedb.org/3";
 const IMG = "https://image.tmdb.org/t/p";
+const VIDSRC_EMBED_BASE = "https://vidsrc-embed.ru";
 const DEFAULT_IMAGE = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+const EMBED_API_PROVIDERS = ["vidplus", "vidsrc-embed"] as const;
+
+export type EmbedApiProvider = (typeof EMBED_API_PROVIDERS)[number];
+
+export const resolveEmbedApiProvider = (provider: string | null | undefined): EmbedApiProvider =>
+  EMBED_API_PROVIDERS.includes(provider as EmbedApiProvider) ? (provider as EmbedApiProvider) : "vidplus";
+
+export const getDefaultEmbedApiProvider = (): EmbedApiProvider =>
+  resolveEmbedApiProvider(import.meta.env.VITE_EMBED_API_PROVIDER as string | undefined);
 
 export const img = (path: string | null, size = "w500") =>
   path
@@ -18,6 +28,12 @@ async function tmdb<T>(endpoint: string, params: Record<string, string> = {}): P
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   const res = await fetch(url.toString());
   if (!res.ok) throw new Error(`TMDB ${res.status}`);
+  return res.json();
+}
+
+async function vidsrcEmbed<T>(endpoint: string): Promise<T> {
+  const res = await fetch(`${VIDSRC_EMBED_BASE}${endpoint}`);
+  if (!res.ok) throw new Error(`VIDSRC ${res.status}`);
   return res.json();
 }
 
@@ -75,15 +91,46 @@ export interface Credits { cast: CastMember[] }
 export const getMovieCredits = (id: number) => tmdb<Credits>(`/movie/${id}/credits`);
 export const getTVCredits = (id: number) => tmdb<Credits>(`/tv/${id}/credits`);
 
+export const buildMovieEmbedUrl = (provider: EmbedApiProvider, tmdbId: number): string =>
+  provider === "vidsrc-embed"
+    ? `${VIDSRC_EMBED_BASE}/embed/movie/${encodeURIComponent(String(tmdbId))}`
+    : `https://player.vidplus.to/embed/movie/${encodeURIComponent(String(tmdbId))}`;
+
+export const buildTVEpisodeEmbedUrl = (
+  provider: EmbedApiProvider,
+  tmdbId: number,
+  season: number,
+  episode: number
+): string =>
+  provider === "vidsrc-embed"
+    ? `${VIDSRC_EMBED_BASE}/embed/tv/${encodeURIComponent(String(tmdbId))}/${encodeURIComponent(String(season))}/${encodeURIComponent(String(episode))}`
+    : `https://player.vidplus.to/embed/tv/${encodeURIComponent(String(tmdbId))}/${encodeURIComponent(String(season))}/${encodeURIComponent(String(episode))}`;
+
+const assertPageNumber = (page: number): void => {
+  if (!Number.isInteger(page) || page < 1) {
+    throw new Error("Page number must be an integer greater than or equal to 1.");
+  }
+};
+
+export const getVidsrcEmbedLatestTVShows = (page: number) => {
+  assertPageNumber(page);
+  return vidsrcEmbed<{ results: Movie[] }>(`/movies/latest/page-${encodeURIComponent(String(page))}.json`);
+};
+
+export const getVidsrcEmbedLatestEpisodes = (page: number) => {
+  assertPageNumber(page);
+  return vidsrcEmbed<{ results: Movie[] }>(`/episodes/latest/page-${encodeURIComponent(String(page))}.json`);
+};
+
 export const buildVidPlusMovieEmbedUrl = (tmdbId: number): string =>
-  `https://player.vidplus.to/embed/movie/${encodeURIComponent(String(tmdbId))}`;
+  buildMovieEmbedUrl("vidplus", tmdbId);
 
 export const buildVidPlusTVEmbedUrl = (
   tmdbId: number,
   season: number,
   episode: number
 ): string =>
-  `https://player.vidplus.to/embed/tv/${encodeURIComponent(String(tmdbId))}/${encodeURIComponent(String(season))}/${encodeURIComponent(String(episode))}`;
+  buildTVEpisodeEmbedUrl("vidplus", tmdbId, season, episode);
 
 export const buildVidPlusAnimeEmbedUrl = (
   anilistId: number,
