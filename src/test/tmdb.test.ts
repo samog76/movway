@@ -154,7 +154,7 @@ describe("vidsrc embed list endpoints", () => {
     expect(calledUrl).toBe("https://vidsrc-embed.ru/episodes/latest/page-3.json");
   });
 
-  it("throws when page number is missing or invalid", async () => {
+  it("throws when page number is invalid", async () => {
     vi.stubGlobal("fetch", mockFetch({ results: [] }));
     const { getVidsrcEmbedLatestMovies, getVidsrcEmbedLatestEpisodes } = await import("@/lib/tmdb");
 

@@ -17,7 +17,7 @@ import {
 } from "@/lib/tmdb";
 import { upsertWatchEntry } from "@/lib/continueWatching";
 import { ArrowLeft, Star } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 const resolveEmbedApiProviderFromParams = (
   params: URLSearchParams,
@@ -28,7 +28,7 @@ export default function WatchPage() {
   const { type, id } = useParams<{ type: string; id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const tmdbId = Number(id);
-  const defaultEmbedApiProvider = getDefaultEmbedApiProvider();
+  const defaultEmbedApiProvider = useMemo(() => getDefaultEmbedApiProvider(), []);
   const rawAnilistId = searchParams.get("anilistId") ?? "";
   const anilistId = Number.parseInt(rawAnilistId, 10);
   const [embedApiProvider, setEmbedApiProvider] = useState<EmbedApiProvider>(() =>
