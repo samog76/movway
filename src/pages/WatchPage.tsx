@@ -17,7 +17,7 @@ import {
 } from "@/lib/tmdb";
 import { upsertWatchEntry } from "@/lib/continueWatching";
 import { ArrowLeft, Star } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 
 const resolveEmbedApiProviderFromParams = (
   params: URLSearchParams,
@@ -28,18 +28,11 @@ export default function WatchPage() {
   const { type, id } = useParams<{ type: string; id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const tmdbId = Number(id);
-  const defaultEmbedApiProvider = useMemo(() => getDefaultEmbedApiProvider(), []);
   const rawAnilistId = searchParams.get("anilistId") ?? "";
   const anilistId = Number.parseInt(rawAnilistId, 10);
-  const [embedApiProvider, setEmbedApiProvider] = useState<EmbedApiProvider>(() =>
-    resolveEmbedApiProviderFromParams(searchParams, defaultEmbedApiProvider)
-  );
+  const embedApiProvider = resolveEmbedApiProviderFromParams(searchParams, getDefaultEmbedApiProvider());
   const isAnime = type === "anime";
   const isTV = type === "tv" || isAnime;
-
-  useEffect(() => {
-    setEmbedApiProvider(resolveEmbedApiProviderFromParams(searchParams, defaultEmbedApiProvider));
-  }, [searchParams, defaultEmbedApiProvider]);
 
   const { data: movie } = useQuery<MovieDetails | TVDetails>({
     queryKey: ["details", type, tmdbId],
@@ -178,7 +171,6 @@ export default function WatchPage() {
                     value={embedApiProvider}
                     onChange={(e) => {
                       const provider = resolveEmbedApiProvider(e.target.value);
-                      setEmbedApiProvider(provider);
                       const nextParams = new URLSearchParams(searchParams);
                       nextParams.set("embedApi", provider);
                       setSearchParams(nextParams, { replace: true });
