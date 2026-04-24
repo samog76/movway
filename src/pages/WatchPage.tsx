@@ -1,4 +1,4 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   getMovieDetails,
@@ -18,8 +18,9 @@ import { useState, useEffect } from "react";
 
 export default function WatchPage() {
   const { type, id } = useParams<{ type: string; id: string }>();
+  const [searchParams] = useSearchParams();
   const tmdbId = Number(id);
-  const anilistId = Number(id);
+  const anilistId = Number(searchParams.get("anilistId"));
   const isAnime = type === "anime";
   const isTV = type === "tv" || isAnime;
 
@@ -60,8 +61,11 @@ export default function WatchPage() {
   }, [movie, season, episode, tmdbId, isTV]);
 
   const title = movie?.title || movie?.name || "Loading...";
+  const hasAnilistId = Number.isFinite(anilistId) && anilistId > 0;
   const embedUrl = isAnime
-    ? buildVidPlusAnimeEmbedUrl(anilistId, episode, dub)
+    ? hasAnilistId
+      ? buildVidPlusAnimeEmbedUrl(anilistId, episode, dub)
+      : null
     : isTV
       ? buildVidPlusTVEmbedUrl(tmdbId, season, episode)
       : buildVidPlusMovieEmbedUrl(tmdbId);
@@ -74,13 +78,19 @@ export default function WatchPage() {
 
       <div className="rounded-2xl overflow-hidden border border-border bg-card">
         <div className="aspect-video w-full">
-          <iframe
-            src={embedUrl}
-            className="w-full h-full"
-            allowFullScreen
-            allow="autoplay; fullscreen; picture-in-picture"
-            title={title}
-          />
+          {embedUrl ? (
+            <iframe
+              src={embedUrl}
+              className="w-full h-full"
+              allowFullScreen
+              allow="autoplay; fullscreen; picture-in-picture"
+              title={title}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground px-4 text-center">
+              Anime playback requires an AniList ID in the URL (`?anilistId=...`).
+            </div>
+          )}
         </div>
       </div>
 
