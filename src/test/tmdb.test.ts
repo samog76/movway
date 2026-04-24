@@ -134,11 +134,11 @@ describe("vidsrc embed list endpoints", () => {
     vi.unstubAllGlobals();
   });
 
-  it("calls latest TV shows endpoint with page number", async () => {
+  it("calls latest movies endpoint with page number", async () => {
     vi.stubGlobal("fetch", mockFetch({ results: [] }));
-    const { getVidsrcEmbedLatestTVShows } = await import("@/lib/tmdb");
+    const { getVidsrcEmbedLatestMovies } = await import("@/lib/tmdb");
 
-    await getVidsrcEmbedLatestTVShows(2);
+    await getVidsrcEmbedLatestMovies(2);
 
     const calledUrl: string = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(calledUrl).toBe("https://vidsrc-embed.ru/movies/latest/page-2.json");
@@ -156,9 +156,18 @@ describe("vidsrc embed list endpoints", () => {
 
   it("throws when page number is missing or invalid", async () => {
     vi.stubGlobal("fetch", mockFetch({ results: [] }));
-    const { getVidsrcEmbedLatestEpisodes } = await import("@/lib/tmdb");
+    const { getVidsrcEmbedLatestMovies, getVidsrcEmbedLatestEpisodes } = await import("@/lib/tmdb");
 
-    expect(() => getVidsrcEmbedLatestEpisodes(0)).toThrow(
+    expect(() => getVidsrcEmbedLatestMovies(0)).toThrow(
+      "Page number must be an integer greater than or equal to 1."
+    );
+    expect(() => getVidsrcEmbedLatestMovies(1.5)).toThrow(
+      "Page number must be an integer greater than or equal to 1."
+    );
+    expect(() => getVidsrcEmbedLatestEpisodes(-1)).toThrow(
+      "Page number must be an integer greater than or equal to 1."
+    );
+    expect(() => getVidsrcEmbedLatestEpisodes(Number.NaN)).toThrow(
       "Page number must be an integer greater than or equal to 1."
     );
   });

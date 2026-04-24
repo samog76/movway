@@ -87,6 +87,13 @@ export interface CastMember {
 }
 
 export interface Credits { cast: CastMember[] }
+export interface VidsrcEmbedListItem {
+  [key: string]: unknown;
+}
+
+export interface VidsrcEmbedListResponse {
+  results: VidsrcEmbedListItem[];
+}
 
 export const getMovieCredits = (id: number) => tmdb<Credits>(`/movie/${id}/credits`);
 export const getTVCredits = (id: number) => tmdb<Credits>(`/tv/${id}/credits`);
@@ -106,20 +113,20 @@ export const buildTVEpisodeEmbedUrl = (
     ? `${VIDSRC_EMBED_BASE}/embed/tv/${encodeURIComponent(String(tmdbId))}/${encodeURIComponent(String(season))}/${encodeURIComponent(String(episode))}`
     : `https://player.vidplus.to/embed/tv/${encodeURIComponent(String(tmdbId))}/${encodeURIComponent(String(season))}/${encodeURIComponent(String(episode))}`;
 
-const assertPageNumber = (page: number): void => {
+const assertValidPageNumber = (page: number): void => {
   if (!Number.isInteger(page) || page < 1) {
     throw new Error("Page number must be an integer greater than or equal to 1.");
   }
 };
 
-export const getVidsrcEmbedLatestTVShows = (page: number) => {
-  assertPageNumber(page);
-  return vidsrcEmbed<{ results: Movie[] }>(`/movies/latest/page-${encodeURIComponent(String(page))}.json`);
+export const getVidsrcEmbedLatestMovies = (page: number) => {
+  assertValidPageNumber(page);
+  return vidsrcEmbed<VidsrcEmbedListResponse>(`/movies/latest/page-${encodeURIComponent(String(page))}.json`);
 };
 
 export const getVidsrcEmbedLatestEpisodes = (page: number) => {
-  assertPageNumber(page);
-  return vidsrcEmbed<{ results: Movie[] }>(`/episodes/latest/page-${encodeURIComponent(String(page))}.json`);
+  assertValidPageNumber(page);
+  return vidsrcEmbed<VidsrcEmbedListResponse>(`/episodes/latest/page-${encodeURIComponent(String(page))}.json`);
 };
 
 export const buildVidPlusMovieEmbedUrl = (tmdbId: number): string =>
