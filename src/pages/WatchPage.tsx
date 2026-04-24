@@ -19,6 +19,7 @@ import { useState, useEffect } from "react";
 export default function WatchPage() {
   const { type, id } = useParams<{ type: string; id: string }>();
   const tmdbId = Number(id);
+  const anilistId = Number(id);
   const isAnime = type === "anime";
   const isTV = type === "tv" || isAnime;
 
@@ -60,7 +61,7 @@ export default function WatchPage() {
 
   const title = movie?.title || movie?.name || "Loading...";
   const embedUrl = isAnime
-    ? buildVidPlusAnimeEmbedUrl(tmdbId, episode, dub)
+    ? buildVidPlusAnimeEmbedUrl(anilistId, episode, dub)
     : isTV
       ? buildVidPlusTVEmbedUrl(tmdbId, season, episode)
       : buildVidPlusMovieEmbedUrl(tmdbId);
@@ -116,7 +117,7 @@ export default function WatchPage() {
                   </label>
                 )}
                 <label className="flex items-center gap-2 text-sm">
-                  {isAnime ? "Episode" : "Episode"}
+                  Episode
                   <input
                     type="number"
                     min={1}
