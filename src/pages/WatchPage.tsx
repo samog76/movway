@@ -20,7 +20,8 @@ export default function WatchPage() {
   const { type, id } = useParams<{ type: string; id: string }>();
   const [searchParams] = useSearchParams();
   const tmdbId = Number(id);
-  const anilistId = Number(searchParams.get("anilistId"));
+  const rawAnilistId = searchParams.get("anilistId") ?? "";
+  const anilistId = Number.parseInt(rawAnilistId, 10);
   const isAnime = type === "anime";
   const isTV = type === "tv" || isAnime;
 
@@ -61,7 +62,7 @@ export default function WatchPage() {
   }, [movie, season, episode, tmdbId, isTV]);
 
   const title = movie?.title || movie?.name || "Loading...";
-  const hasAnilistId = Number.isFinite(anilistId) && anilistId > 0;
+  const hasAnilistId = !Number.isNaN(anilistId) && anilistId > 0;
   const embedUrl = isAnime
     ? hasAnilistId
       ? buildVidPlusAnimeEmbedUrl(anilistId, episode, dub)
