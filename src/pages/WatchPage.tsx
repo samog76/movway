@@ -6,73 +6,12 @@ import {
   getMovieCredits,
   getTVCredits,
   img,
-  buildMoviePlayerUrl,
-  buildTVPlayerUrl,
-  moviePlayerProviders,
-  tvPlayerProviders,
-  DEFAULT_MOVIE_PLAYER_PROVIDER,
-  DEFAULT_TV_PLAYER_PROVIDER,
-  type MoviePlayerProviderId,
-  type TVPlayerProviderId,
   type MovieDetails,
   type TVDetails,
 } from "@/lib/tmdb";
 import { upsertWatchEntry } from "@/lib/continueWatching";
 import { ArrowLeft, Star } from "lucide-react";
 import { useState, useEffect } from "react";
-
-const ALLOWED_EMBED_HOSTS = [
-  "vidsrc.me",
-  "fsapi.xyz",
-  "curtstream.com",
-  "moviewp.com",
-  "v2.apimdb.net",
-  "gomo.to",
-  "vidcloud.stream",
-  "getsuperembed.link",
-  "databasegdriveplayer.co",
-];
-
-function isAllowedEmbedUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== "https:") return false;
-    return ALLOWED_EMBED_HOSTS.some(
-      (host) => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`)
-    );
-  } catch {
-    return false;
-  }
-}
-
-async function resolveSuperEmbedUrl(url: string): Promise<string> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`SuperEmbed ${res.status}`);
-
-  const body = (await res.text()).trim();
-  if (!body) throw new Error("SuperEmbed empty response");
-
-  try {
-    const parsed = JSON.parse(body);
-    if (typeof parsed === "string" && isAllowedEmbedUrl(parsed)) return parsed;
-    if (parsed && typeof parsed === "object") {
-      const candidate = [parsed.url, parsed.embed, parsed.embed_url, parsed.link].find(
-        (value) => typeof value === "string" && isAllowedEmbedUrl(value)
-      );
-      if (typeof candidate === "string") return candidate;
-    }
-  } catch {
-    // Continue with text/HTML extraction
-  }
-
-  const iframeSrc = body.match(/<iframe[^>]+src=["']([^"']+)["']/i)?.[1];
-  if (iframeSrc && isAllowedEmbedUrl(iframeSrc)) return iframeSrc;
-
-  const rawUrl = body.match(/https:\/\/[^\s"'<>]+/i)?.[0];
-  if (rawUrl && isAllowedEmbedUrl(rawUrl)) return rawUrl;
-
-  throw new Error("SuperEmbed response did not contain a safe embed URL");
-}
 
 export default function WatchPage() {
   const { type, id } = useParams<{ type: string; id: string }>();
@@ -98,28 +37,6 @@ export default function WatchPage() {
 
   const [season, setSeason] = useState(1);
   const [episode, setEpisode] = useState(1);
-  const [movieProvider, setMovieProvider] = useState<MoviePlayerProviderId>(DEFAULT_MOVIE_PLAYER_PROVIDER);
-  const [tvProvider, setTvProvider] = useState<TVPlayerProviderId>(DEFAULT_TV_PLAYER_PROVIDER);
-
-  useEffect(() => {
-    const savedMovieProvider = localStorage.getItem("movway:movie-provider");
-    const savedTvProvider = localStorage.getItem("movway:tv-provider");
-
-    if (savedMovieProvider && moviePlayerProviders.some((provider) => provider.id === savedMovieProvider)) {
-      setMovieProvider(savedMovieProvider as MoviePlayerProviderId);
-    }
-    if (savedTvProvider && tvPlayerProviders.some((provider) => provider.id === savedTvProvider)) {
-      setTvProvider(savedTvProvider as TVPlayerProviderId);
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("movway:movie-provider", movieProvider);
-  }, [movieProvider]);
-
-  useEffect(() => {
-    localStorage.setItem("movway:tv-provider", tvProvider);
-  }, [tvProvider]);
 
   useEffect(() => {
     if (!movie) return;
@@ -138,40 +55,7 @@ export default function WatchPage() {
     });
   }, [movie, season, episode, tmdbId, isTV]);
 
-  const imdbId = movie
-    ? ("external_ids" in movie ? movie.external_ids?.imdb_id : movie.imdb_id)
-    : undefined;
-  const selectedProvider = isTV ? tvProvider : movieProvider;
-
-  const { data: embedUrl, error: embedError } = useQuery({
-    queryKey: ["embed-url", isTV ? "tv" : "movie", selectedProvider, tmdbId, imdbId, season, episode],
-    enabled: Boolean(movie),
-    queryFn: async () => {
-      if (isTV) {
-        const url = buildTVPlayerUrl(tvProvider, tmdbId, season, episode, imdbId);
-        if (!url) {
-          throw new Error(`Provider "${tvProvider}" requires IMDb ID, but it was not found.`);
-        }
-        if (tvProvider === "getsuperembed") {
-          return resolveSuperEmbedUrl(url);
-        }
-        return url;
-      }
-
-      if (!imdbId) {
-        throw new Error("IMDb ID is required for this provider but was not found. Please try selecting a different source.");
-      }
-
-      const url = buildMoviePlayerUrl(movieProvider, imdbId);
-      if (movieProvider === "getsuperembed") {
-        return resolveSuperEmbedUrl(url);
-      }
-      return url;
-    },
-  });
-
   const title = movie?.title || movie?.name || "Loading...";
-  const embedErrorMessage = embedError instanceof Error ? embedError.message : null;
 
   return (
     <div className="space-y-6">
@@ -180,39 +64,10 @@ export default function WatchPage() {
       </Link>
 
       <div className="rounded-2xl overflow-hidden border border-border bg-card">
-        <div className="px-4 py-3 border-b border-border flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-sm">
-            Source
-            <select
-              value={isTV ? tvProvider : movieProvider}
-              onChange={(e) => {
-                if (isTV) setTvProvider(e.target.value as TVPlayerProviderId);
-                else setMovieProvider(e.target.value as MoviePlayerProviderId);
-              }}
-              className="bg-secondary text-foreground rounded-lg px-3 py-1.5 text-sm border border-border"
-            >
-              {(isTV ? tvPlayerProviders : moviePlayerProviders).map((provider) => (
-                <option key={provider.id} value={provider.id}>
-                  {provider.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
         <div className="aspect-video w-full">
-          {embedUrl ? (
-            <iframe
-              src={embedUrl}
-              className="w-full h-full"
-              allowFullScreen
-              allow="autoplay; fullscreen; picture-in-picture"
-              title={title}
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground px-4 text-center">
-              {embedErrorMessage || "Loading player source..."}
-            </div>
-          )}
+          <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground px-4 text-center">
+            Player APIs have been removed.
+          </div>
         </div>
       </div>
 
