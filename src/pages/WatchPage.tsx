@@ -21,6 +21,30 @@ import { upsertWatchEntry } from "@/lib/continueWatching";
 import { ArrowLeft, Star } from "lucide-react";
 import { useState, useEffect } from "react";
 
+const ALLOWED_EMBED_HOSTS = [
+  "vidsrc.me",
+  "fsapi.xyz",
+  "curtstream.com",
+  "moviewp.com",
+  "v2.apimdb.net",
+  "gomo.to",
+  "vidcloud.stream",
+  "getsuperembed.link",
+  "databasegdriveplayer.co",
+];
+
+function isAllowedEmbedUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return false;
+    return ALLOWED_EMBED_HOSTS.some(
+      (host) => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`)
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function resolveSuperEmbedUrl(url: string): Promise<string> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`SuperEmbed ${res.status}`);
@@ -30,10 +54,10 @@ async function resolveSuperEmbedUrl(url: string): Promise<string> {
 
   try {
     const parsed = JSON.parse(body);
-    if (typeof parsed === "string" && /^https?:\/\//i.test(parsed)) return parsed;
+    if (typeof parsed === "string" && isAllowedEmbedUrl(parsed)) return parsed;
     if (parsed && typeof parsed === "object") {
       const candidate = [parsed.url, parsed.embed, parsed.embed_url, parsed.link].find(
-        (value) => typeof value === "string" && /^https?:\/\//i.test(value)
+        (value) => typeof value === "string" && isAllowedEmbedUrl(value)
       );
       if (typeof candidate === "string") return candidate;
     }
@@ -42,12 +66,12 @@ async function resolveSuperEmbedUrl(url: string): Promise<string> {
   }
 
   const iframeSrc = body.match(/<iframe[^>]+src=["']([^"']+)["']/i)?.[1];
-  if (iframeSrc && /^https?:\/\//i.test(iframeSrc)) return iframeSrc;
+  if (iframeSrc && isAllowedEmbedUrl(iframeSrc)) return iframeSrc;
 
-  const rawUrl = body.match(/https?:\/\/[^\s"'<>]+/i)?.[0];
-  if (rawUrl) return rawUrl;
+  const rawUrl = body.match(/https:\/\/[^\s"'<>]+/i)?.[0];
+  if (rawUrl && isAllowedEmbedUrl(rawUrl)) return rawUrl;
 
-  throw new Error("SuperEmbed URL not found in response");
+  throw new Error("SuperEmbed response did not contain a safe embed URL");
 }
 
 export default function WatchPage() {
@@ -135,7 +159,7 @@ export default function WatchPage() {
       }
 
       if (!imdbId) {
-        throw new Error("IMDb ID was not found for this movie.");
+        throw new Error("IMDb ID is required for this provider but was not found. Please try selecting a different source.");
       }
 
       const url = buildMoviePlayerUrl(movieProvider, imdbId);
