@@ -69,6 +69,9 @@ export default function WatchPage() {
     : isTV
       ? buildVidPlusTVEmbedUrl(tmdbId, season, episode)
       : buildVidPlusMovieEmbedUrl(tmdbId);
+  const embedUnavailableMessage = isAnime && !hasAnilistId
+    ? "Anime playback requires an AniList ID in the URL (`?anilistId=...`)."
+    : "Video playback is currently unavailable.";
 
   return (
     <div className="space-y-6">
@@ -88,7 +91,7 @@ export default function WatchPage() {
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground px-4 text-center">
-              Anime playback requires an AniList ID in the URL (`?anilistId=...`).
+              {embedUnavailableMessage}
             </div>
           )}
         </div>

@@ -90,4 +90,4 @@ export const buildVidPlusAnimeEmbedUrl = (
   episode: number,
   dub: boolean
 ): string =>
-  `https://player.vidplus.to/embed/anime/${encodeURIComponent(String(anilistId))}/${encodeURIComponent(String(episode))}?dub=${encodeURIComponent(String(dub))}`;
+  `https://player.vidplus.to/embed/anime/${encodeURIComponent(String(anilistId))}/${encodeURIComponent(String(episode))}?dub=${dub ? "true" : "false"}`;
