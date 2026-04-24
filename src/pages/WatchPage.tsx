@@ -6,9 +6,12 @@ import {
   getMovieCredits,
   getTVCredits,
   img,
-  buildVidPlusMovieEmbedUrl,
-  buildVidPlusTVEmbedUrl,
+  buildMovieEmbedUrl,
+  buildTVEpisodeEmbedUrl,
   buildVidPlusAnimeEmbedUrl,
+  getDefaultEmbedApiProvider,
+  resolveEmbedApiProvider,
+  type EmbedApiProvider,
   type MovieDetails,
   type TVDetails,
 } from "@/lib/tmdb";
@@ -16,12 +19,18 @@ import { upsertWatchEntry } from "@/lib/continueWatching";
 import { ArrowLeft, Star } from "lucide-react";
 import { useState, useEffect } from "react";
 
+const resolveEmbedApiProviderFromParams = (
+  params: URLSearchParams,
+  defaultProvider: EmbedApiProvider
+): EmbedApiProvider => resolveEmbedApiProvider(params.get("embedApi") ?? defaultProvider);
+
 export default function WatchPage() {
   const { type, id } = useParams<{ type: string; id: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const tmdbId = Number(id);
   const rawAnilistId = searchParams.get("anilistId") ?? "";
   const anilistId = Number.parseInt(rawAnilistId, 10);
+  const embedApiProvider = resolveEmbedApiProviderFromParams(searchParams, getDefaultEmbedApiProvider());
   const isAnime = type === "anime";
   const isTV = type === "tv" || isAnime;
 
@@ -68,8 +77,8 @@ export default function WatchPage() {
       ? buildVidPlusAnimeEmbedUrl(anilistId, episode, dub)
       : null
     : isTV
-      ? buildVidPlusTVEmbedUrl(tmdbId, season, episode)
-      : buildVidPlusMovieEmbedUrl(tmdbId);
+      ? buildTVEpisodeEmbedUrl(embedApiProvider, tmdbId, season, episode)
+      : buildMovieEmbedUrl(embedApiProvider, tmdbId);
   const embedUnavailableMessage = isAnime && !hasAnilistId
     ? "Anime playback requires an AniList ID in the URL (`?anilistId=...`)."
     : "Video playback is currently unavailable.";
@@ -151,6 +160,27 @@ export default function WatchPage() {
                     />
                   </label>
                 )}
+              </div>
+            )}
+
+            {!isAnime && (
+              <div className="pt-2">
+                <label className="flex items-center gap-2 text-sm">
+                  Embed API
+                  <select
+                    value={embedApiProvider}
+                    onChange={(e) => {
+                      const provider = resolveEmbedApiProvider(e.target.value);
+                      const nextParams = new URLSearchParams(searchParams);
+                      nextParams.set("embedApi", provider);
+                      setSearchParams(nextParams, { replace: true });
+                    }}
+                    className="bg-secondary text-foreground rounded-lg px-3 py-1.5 text-sm border border-border"
+                  >
+                    <option value="vidplus">VidPlus</option>
+                    <option value="vidsrc-embed">Vidsrc Embed</option>
+                  </select>
+                </label>
               </div>
             )}
           </div>
