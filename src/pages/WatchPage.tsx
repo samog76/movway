@@ -14,6 +14,8 @@ import {
   DEFAULT_TV_PLAYER_PROVIDER,
   type MoviePlayerProviderId,
   type TVPlayerProviderId,
+  type MovieDetails,
+  type TVDetails,
 } from "@/lib/tmdb";
 import { upsertWatchEntry } from "@/lib/continueWatching";
 import { ArrowLeft, Star } from "lucide-react";
@@ -55,11 +57,11 @@ export default function WatchPage() {
   // the correct TMDB details and credits endpoints are always called.
   const isTV = type === "tv";
 
-  const { data: movie } = useQuery({
+  const { data: movie } = useQuery<MovieDetails | TVDetails>({
     queryKey: ["details", type, tmdbId],
     queryFn: async () => {
-      if (isTV) return getTVDetails(tmdbId) as Promise<any>;
-      return getMovieDetails(tmdbId) as Promise<any>;
+      if (isTV) return getTVDetails(tmdbId);
+      return getMovieDetails(tmdbId);
     },
   });
 
@@ -112,7 +114,9 @@ export default function WatchPage() {
     });
   }, [movie, season, episode, tmdbId, isTV]);
 
-  const imdbId = isTV ? (movie as any)?.external_ids?.imdb_id : (movie as any)?.imdb_id;
+  const imdbId = movie
+    ? ("external_ids" in movie ? movie.external_ids?.imdb_id : movie.imdb_id)
+    : undefined;
   const selectedProvider = isTV ? tvProvider : movieProvider;
 
   const { data: embedUrl, error: embedError } = useQuery({
@@ -143,6 +147,7 @@ export default function WatchPage() {
   });
 
   const title = movie?.title || movie?.name || "Loading...";
+  const embedErrorMessage = embedError instanceof Error ? embedError.message : null;
 
   return (
     <div className="space-y-6">
@@ -181,7 +186,7 @@ export default function WatchPage() {
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground px-4 text-center">
-              {(embedError as Error | null)?.message || "Loading player source..."}
+              {embedErrorMessage || "Loading player source..."}
             </div>
           )}
         </div>
@@ -196,8 +201,8 @@ export default function WatchPage() {
                 <Star size={14} className="text-primary fill-primary" />
                 {movie.vote_average.toFixed(1)}
               </span>
-              {(movie as any).runtime && <span>{(movie as any).runtime} min</span>}
-              {(movie as any).genres?.map((g: any) => (
+              {"runtime" in movie && movie.runtime ? <span>{movie.runtime} min</span> : null}
+              {movie.genres?.map((g) => (
                 <span key={g.id} className="px-2 py-0.5 rounded-md bg-secondary text-xs">{g.name}</span>
               ))}
             </div>
@@ -212,7 +217,7 @@ export default function WatchPage() {
                     onChange={(e) => { setSeason(Number(e.target.value)); setEpisode(1); }}
                     className="bg-secondary text-foreground rounded-lg px-3 py-1.5 text-sm border border-border"
                   >
-                    {Array.from({ length: (movie as any).number_of_seasons || 1 }, (_, i) => (
+                    {Array.from({ length: ("number_of_seasons" in movie ? movie.number_of_seasons : 1) || 1 }, (_, i) => (
                       <option key={i + 1} value={i + 1}>S{i + 1}</option>
                     ))}
                   </select>
