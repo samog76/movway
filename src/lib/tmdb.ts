@@ -75,95 +75,19 @@ export interface Credits { cast: CastMember[] }
 export const getMovieCredits = (id: number) => tmdb<Credits>(`/movie/${id}/credits`);
 export const getTVCredits = (id: number) => tmdb<Credits>(`/tv/${id}/credits`);
 
-export type MoviePlayerProviderId =
-  | "vidsrc"
-  | "fsapi"
-  | "curtstream"
-  | "moviewp"
-  | "apimdb"
-  | "gomo"
-  | "vidcloud"
-  | "getsuperembed";
+export const buildVidPlusMovieEmbedUrl = (tmdbId: number): string =>
+  `https://player.vidplus.to/embed/movie/${encodeURIComponent(String(tmdbId))}`;
 
-export type TVPlayerProviderId =
-  | "fsapi"
-  | "moviewp"
-  | "apimdb"
-  | "databasegdriveplayer"
-  | "curtstream"
-  | "getsuperembed";
-
-export const moviePlayerProviders: { id: MoviePlayerProviderId; label: string }[] = [
-  { id: "vidsrc", label: "Vidsrc" },
-  { id: "fsapi", label: "FSAPI" },
-  { id: "curtstream", label: "CurtStream" },
-  { id: "moviewp", label: "MovieWP" },
-  { id: "apimdb", label: "APIIMDb v2" },
-  { id: "gomo", label: "Gomo" },
-  { id: "vidcloud", label: "VidCloud" },
-  { id: "getsuperembed", label: "GetSuperEmbed" },
-];
-
-export const tvPlayerProviders: { id: TVPlayerProviderId; label: string }[] = [
-  { id: "fsapi", label: "FSAPI" },
-  { id: "moviewp", label: "MovieWP" },
-  { id: "apimdb", label: "APIIMDb v2" },
-  { id: "databasegdriveplayer", label: "DatabaseGDrivePlayer" },
-  { id: "curtstream", label: "CurtStream" },
-  { id: "getsuperembed", label: "GetSuperEmbed" },
-];
-
-export const DEFAULT_MOVIE_PLAYER_PROVIDER: MoviePlayerProviderId = "vidsrc";
-export const DEFAULT_TV_PLAYER_PROVIDER: TVPlayerProviderId = "fsapi";
-
-export function buildMoviePlayerUrl(provider: MoviePlayerProviderId, imdbId: string): string {
-  const encodedImdbId = encodeURIComponent(imdbId);
-  switch (provider) {
-    case "vidsrc":
-      return `https://vidsrc.me/embed/${encodedImdbId}/`;
-    case "fsapi":
-      return `https://fsapi.xyz/movie/${encodedImdbId}`;
-    case "curtstream":
-      return `https://curtstream.com/movies/imdb/${encodedImdbId}`;
-    case "moviewp":
-      return `https://moviewp.com/se.php?video_id=${encodedImdbId}`;
-    case "apimdb":
-      return `https://v2.apimdb.net/e/movie/${encodedImdbId}`;
-    case "gomo":
-      return `https://gomo.to/movie/${encodedImdbId}`;
-    case "vidcloud":
-      return `https://vidcloud.stream/${encodedImdbId}.html`;
-    case "getsuperembed":
-      return `https://getsuperembed.link/?video_id=${encodedImdbId}`;
-  }
-}
-
-export function buildTVPlayerUrl(
-  provider: TVPlayerProviderId,
+export const buildVidPlusTVEmbedUrl = (
   tmdbId: number,
   season: number,
-  episode: number,
-  imdbId?: string | null
-): string | null {
-  const encodedSeason = encodeURIComponent(String(season));
-  const encodedEpisode = encodeURIComponent(String(episode));
-  const encodedTmdbId = encodeURIComponent(String(tmdbId));
-  const encodedImdbId = imdbId ? encodeURIComponent(imdbId) : null;
+  episode: number
+): string =>
+  `https://player.vidplus.to/embed/tv/${encodeURIComponent(String(tmdbId))}/${encodeURIComponent(String(season))}/${encodeURIComponent(String(episode))}`;
 
-  switch (provider) {
-    case "fsapi":
-      return encodedImdbId ? `https://fsapi.xyz/tv-imdb/${encodedImdbId}-${encodedSeason}-${encodedEpisode}` : null;
-    case "moviewp":
-      return `https://moviewp.com/se.php?video_id=${encodedTmdbId}&tmdb=1&s=${encodedSeason}&e=${encodedEpisode}`;
-    case "apimdb":
-      return `https://v2.apimdb.net/e/tmdb/tv/${encodedTmdbId}/${encodedSeason}/${encodedEpisode}/`;
-    case "databasegdriveplayer":
-      return `https://databasegdriveplayer.co/player.php?type=series&tmdb=${encodedTmdbId}&season=${encodedSeason}&episode=${encodedEpisode}`;
-    case "curtstream":
-      return `https://curtstream.com/series/tmdb/${encodedTmdbId}/${encodedSeason}/${encodedEpisode}/`;
-    case "getsuperembed":
-      return encodedImdbId
-        ? `https://getsuperembed.link/?video_id=${encodedImdbId}&season=${encodedSeason}&episode=${encodedEpisode}`
-        : null;
-  }
-}
+export const buildVidPlusAnimeEmbedUrl = (
+  anilistId: number,
+  episode: number,
+  dub: boolean
+): string =>
+  `https://player.vidplus.to/embed/anime/${encodeURIComponent(String(anilistId))}/${encodeURIComponent(String(episode))}?dub=${dub ? "true" : "false"}`;
