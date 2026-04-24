@@ -66,7 +66,7 @@ export default function WatchPage() {
       <div className="rounded-2xl overflow-hidden border border-border bg-card">
         <div className="aspect-video w-full">
           <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground px-4 text-center">
-            Player APIs have been removed.
+            Video playback is currently unavailable because player APIs were removed.
           </div>
         </div>
       </div>
