@@ -6,6 +6,9 @@ import {
   getMovieCredits,
   getTVCredits,
   img,
+  buildVidPlusMovieEmbedUrl,
+  buildVidPlusTVEmbedUrl,
+  buildVidPlusAnimeEmbedUrl,
   type MovieDetails,
   type TVDetails,
 } from "@/lib/tmdb";
@@ -16,9 +19,8 @@ import { useState, useEffect } from "react";
 export default function WatchPage() {
   const { type, id } = useParams<{ type: string; id: string }>();
   const tmdbId = Number(id);
-  // Normalize type: anything other than "tv" is treated as "movie" to ensure
-  // the correct TMDB details and credits endpoints are always called.
-  const isTV = type === "tv";
+  const isAnime = type === "anime";
+  const isTV = type === "tv" || isAnime;
 
   const { data: movie } = useQuery<MovieDetails | TVDetails>({
     queryKey: ["details", type, tmdbId],
@@ -37,6 +39,7 @@ export default function WatchPage() {
 
   const [season, setSeason] = useState(1);
   const [episode, setEpisode] = useState(1);
+  const [dub, setDub] = useState(false);
 
   useEffect(() => {
     if (!movie) return;
@@ -56,6 +59,11 @@ export default function WatchPage() {
   }, [movie, season, episode, tmdbId, isTV]);
 
   const title = movie?.title || movie?.name || "Loading...";
+  const embedUrl = isAnime
+    ? buildVidPlusAnimeEmbedUrl(tmdbId, episode, dub)
+    : isTV
+      ? buildVidPlusTVEmbedUrl(tmdbId, season, episode)
+      : buildVidPlusMovieEmbedUrl(tmdbId);
 
   return (
     <div className="space-y-6">
@@ -65,9 +73,13 @@ export default function WatchPage() {
 
       <div className="rounded-2xl overflow-hidden border border-border bg-card">
         <div className="aspect-video w-full">
-          <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground px-4 text-center">
-            Video playback is currently unavailable because player APIs were removed.
-          </div>
+          <iframe
+            src={embedUrl}
+            className="w-full h-full"
+            allowFullScreen
+            allow="autoplay; fullscreen; picture-in-picture"
+            title={title}
+          />
         </div>
       </div>
 
@@ -89,20 +101,22 @@ export default function WatchPage() {
 
             {isTV && (
               <div className="flex flex-wrap items-center gap-4 pt-2">
+                {!isAnime && (
+                  <label className="flex items-center gap-2 text-sm">
+                    Season
+                    <select
+                      value={season}
+                      onChange={(e) => { setSeason(Number(e.target.value)); setEpisode(1); }}
+                      className="bg-secondary text-foreground rounded-lg px-3 py-1.5 text-sm border border-border"
+                    >
+                      {Array.from({ length: ("number_of_seasons" in movie ? movie.number_of_seasons : 1) || 1 }, (_, i) => (
+                        <option key={i + 1} value={i + 1}>S{i + 1}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <label className="flex items-center gap-2 text-sm">
-                  Season
-                  <select
-                    value={season}
-                    onChange={(e) => { setSeason(Number(e.target.value)); setEpisode(1); }}
-                    className="bg-secondary text-foreground rounded-lg px-3 py-1.5 text-sm border border-border"
-                  >
-                    {Array.from({ length: ("number_of_seasons" in movie ? movie.number_of_seasons : 1) || 1 }, (_, i) => (
-                      <option key={i + 1} value={i + 1}>S{i + 1}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  Episode
+                  {isAnime ? "Episode" : "Episode"}
                   <input
                     type="number"
                     min={1}
@@ -111,6 +125,17 @@ export default function WatchPage() {
                     className="bg-secondary text-foreground rounded-lg px-3 py-1.5 text-sm border border-border w-20"
                   />
                 </label>
+                {isAnime && (
+                  <label className="flex items-center gap-2 text-sm">
+                    Dub
+                    <input
+                      type="checkbox"
+                      checked={dub}
+                      onChange={(e) => setDub(e.target.checked)}
+                      className="h-4 w-4 accent-primary"
+                    />
+                  </label>
+                )}
               </div>
             )}
           </div>

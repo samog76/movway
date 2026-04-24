@@ -75,3 +75,19 @@ export interface Credits { cast: CastMember[] }
 export const getMovieCredits = (id: number) => tmdb<Credits>(`/movie/${id}/credits`);
 export const getTVCredits = (id: number) => tmdb<Credits>(`/tv/${id}/credits`);
 
+export const buildVidPlusMovieEmbedUrl = (tmdbId: number): string =>
+  `https://player.vidplus.to/embed/movie/${encodeURIComponent(String(tmdbId))}`;
+
+export const buildVidPlusTVEmbedUrl = (
+  tmdbId: number,
+  season: number,
+  episode: number
+): string =>
+  `https://player.vidplus.to/embed/tv/${encodeURIComponent(String(tmdbId))}/${encodeURIComponent(String(season))}/${encodeURIComponent(String(episode))}`;
+
+export const buildVidPlusAnimeEmbedUrl = (
+  anilistId: number,
+  number: number,
+  dub: boolean
+): string =>
+  `https://player.vidplus.to/embed/anime/${encodeURIComponent(String(anilistId))}/${encodeURIComponent(String(number))}?dub=${encodeURIComponent(String(dub))}`;
