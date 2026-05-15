@@ -3,17 +3,8 @@ const TMDB_API_KEY =
   "2dca580c2a14b55200e784d157207b4d";
 const BASE = "https://api.themoviedb.org/3";
 const IMG = "https://image.tmdb.org/t/p";
-const VIDSRC_EMBED_BASE = "https://vidsrc-embed.ru";
+const VIDCORE_BASE = "https://vidcore.net";
 const DEFAULT_IMAGE = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
-const EMBED_API_PROVIDERS = ["vidplus", "vidsrc-embed"] as const;
-
-export type EmbedApiProvider = (typeof EMBED_API_PROVIDERS)[number];
-
-export const resolveEmbedApiProvider = (provider: string | null | undefined): EmbedApiProvider =>
-  EMBED_API_PROVIDERS.includes(provider as EmbedApiProvider) ? (provider as EmbedApiProvider) : "vidplus";
-
-export const getDefaultEmbedApiProvider = (): EmbedApiProvider =>
-  resolveEmbedApiProvider(import.meta.env.VITE_EMBED_API_PROVIDER as string | undefined);
 
 export const img = (path: string | null, size = "w500") =>
   path
@@ -28,12 +19,6 @@ async function tmdb<T>(endpoint: string, params: Record<string, string> = {}): P
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   const res = await fetch(url.toString());
   if (!res.ok) throw new Error(`TMDB ${res.status}`);
-  return res.json();
-}
-
-async function vidsrcEmbed<T>(endpoint: string): Promise<T> {
-  const res = await fetch(`${VIDSRC_EMBED_BASE}${endpoint}`);
-  if (!res.ok) throw new Error(`VIDSRC ${res.status}`);
   return res.json();
 }
 
@@ -87,61 +72,53 @@ export interface CastMember {
 }
 
 export interface Credits { cast: CastMember[] }
-export interface VidsrcEmbedListItem {
-  [key: string]: unknown;
-}
-
-export interface VidsrcEmbedListResponse {
-  results: VidsrcEmbedListItem[];
-}
 
 export const getMovieCredits = (id: number) => tmdb<Credits>(`/movie/${id}/credits`);
 export const getTVCredits = (id: number) => tmdb<Credits>(`/tv/${id}/credits`);
 
-export const buildMovieEmbedUrl = (provider: EmbedApiProvider, tmdbId: number): string =>
-  provider === "vidsrc-embed"
-    ? `${VIDSRC_EMBED_BASE}/embed/movie/${encodeURIComponent(String(tmdbId))}`
-    : `https://player.vidplus.to/embed/movie/${encodeURIComponent(String(tmdbId))}`;
+interface VidCoreCommonEmbedOptions {
+  title?: boolean;
+  poster?: boolean;
+  autoPlay?: boolean;
+  startAt?: number;
+  theme?: string;
+  server?: string;
+  hideServer?: boolean;
+  fullscreenButton?: boolean;
+  chromecast?: boolean;
+  sub?: string;
+}
+
+interface VidCoreTVEmbedOptions extends VidCoreCommonEmbedOptions {
+  nextButton?: boolean;
+  autoNext?: boolean;
+}
+
+const appendEmbedParams = (url: URL, params: Record<string, string | number | boolean | null | undefined>) => {
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === null || value === undefined) return;
+    url.searchParams.set(key, String(value));
+  });
+};
+
+export const buildMovieEmbedUrl = (
+  tmdbId: number,
+  options: VidCoreCommonEmbedOptions = {}
+): string => {
+  const url = new URL(`${VIDCORE_BASE}/movie/${encodeURIComponent(String(tmdbId))}`);
+  appendEmbedParams(url, { autoPlay: true, ...options });
+  return url.toString();
+};
 
 export const buildTVEpisodeEmbedUrl = (
-  provider: EmbedApiProvider,
   tmdbId: number,
   season: number,
-  episode: number
-): string =>
-  provider === "vidsrc-embed"
-    ? `${VIDSRC_EMBED_BASE}/embed/tv/${encodeURIComponent(String(tmdbId))}/${encodeURIComponent(String(season))}/${encodeURIComponent(String(episode))}`
-    : `https://player.vidplus.to/embed/tv/${encodeURIComponent(String(tmdbId))}/${encodeURIComponent(String(season))}/${encodeURIComponent(String(episode))}`;
-
-const assertValidPageNumber = (page: number): void => {
-  if (!Number.isInteger(page) || page < 1) {
-    throw new Error("Page number must be an integer greater than or equal to 1.");
-  }
-};
-
-export const getVidsrcEmbedLatestMovies = (page: number) => {
-  assertValidPageNumber(page);
-  return vidsrcEmbed<VidsrcEmbedListResponse>(`/movies/latest/page-${encodeURIComponent(String(page))}.json`);
-};
-
-export const getVidsrcEmbedLatestEpisodes = (page: number) => {
-  assertValidPageNumber(page);
-  return vidsrcEmbed<VidsrcEmbedListResponse>(`/episodes/latest/page-${encodeURIComponent(String(page))}.json`);
-};
-
-export const buildVidPlusMovieEmbedUrl = (tmdbId: number): string =>
-  buildMovieEmbedUrl("vidplus", tmdbId);
-
-export const buildVidPlusTVEmbedUrl = (
-  tmdbId: number,
-  season: number,
-  episode: number
-): string =>
-  buildTVEpisodeEmbedUrl("vidplus", tmdbId, season, episode);
-
-export const buildVidPlusAnimeEmbedUrl = (
-  anilistId: number,
   episode: number,
-  dub: boolean
-): string =>
-  `https://player.vidplus.to/embed/anime/${encodeURIComponent(String(anilistId))}/${encodeURIComponent(String(episode))}?dub=${dub ? "true" : "false"}`;
+  options: VidCoreTVEmbedOptions = {}
+): string => {
+  const url = new URL(
+    `${VIDCORE_BASE}/tv/${encodeURIComponent(String(tmdbId))}/${encodeURIComponent(String(season))}/${encodeURIComponent(String(episode))}`
+  );
+  appendEmbedParams(url, { autoPlay: true, ...options });
+  return url.toString();
+};

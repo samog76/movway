@@ -1,4 +1,4 @@
-import { useParams, Link, useSearchParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   getMovieDetails,
@@ -8,10 +8,6 @@ import {
   img,
   buildMovieEmbedUrl,
   buildTVEpisodeEmbedUrl,
-  buildVidPlusAnimeEmbedUrl,
-  getDefaultEmbedApiProvider,
-  resolveEmbedApiProvider,
-  type EmbedApiProvider,
   type MovieDetails,
   type TVDetails,
 } from "@/lib/tmdb";
@@ -19,20 +15,10 @@ import { upsertWatchEntry } from "@/lib/continueWatching";
 import { ArrowLeft, Star } from "lucide-react";
 import { useState, useEffect } from "react";
 
-const resolveEmbedApiProviderFromParams = (
-  params: URLSearchParams,
-  defaultProvider: EmbedApiProvider
-): EmbedApiProvider => resolveEmbedApiProvider(params.get("embedApi") ?? defaultProvider);
-
 export default function WatchPage() {
   const { type, id } = useParams<{ type: string; id: string }>();
-  const [searchParams, setSearchParams] = useSearchParams();
   const tmdbId = Number(id);
-  const rawAnilistId = searchParams.get("anilistId") ?? "";
-  const anilistId = Number.parseInt(rawAnilistId, 10);
-  const embedApiProvider = resolveEmbedApiProviderFromParams(searchParams, getDefaultEmbedApiProvider());
-  const isAnime = type === "anime";
-  const isTV = type === "tv" || isAnime;
+  const isTV = type === "tv" || type === "anime";
 
   const { data: movie } = useQuery<MovieDetails | TVDetails>({
     queryKey: ["details", type, tmdbId],
@@ -51,7 +37,6 @@ export default function WatchPage() {
 
   const [season, setSeason] = useState(1);
   const [episode, setEpisode] = useState(1);
-  const [dub, setDub] = useState(false);
 
   useEffect(() => {
     if (!movie) return;
@@ -71,17 +56,9 @@ export default function WatchPage() {
   }, [movie, season, episode, tmdbId, isTV]);
 
   const title = movie?.title || movie?.name || "Loading...";
-  const hasAnilistId = !Number.isNaN(anilistId) && anilistId > 0;
-  const embedUrl = isAnime
-    ? hasAnilistId
-      ? buildVidPlusAnimeEmbedUrl(anilistId, episode, dub)
-      : null
-    : isTV
-      ? buildTVEpisodeEmbedUrl(embedApiProvider, tmdbId, season, episode)
-      : buildMovieEmbedUrl(embedApiProvider, tmdbId);
-  const embedUnavailableMessage = isAnime && !hasAnilistId
-    ? "Anime playback requires an AniList ID in the URL (`?anilistId=...`)."
-    : "Video playback is currently unavailable.";
+  const embedUrl = isTV
+    ? buildTVEpisodeEmbedUrl(tmdbId, season, episode)
+    : buildMovieEmbedUrl(tmdbId);
 
   return (
     <div className="space-y-6">
@@ -101,7 +78,7 @@ export default function WatchPage() {
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground px-4 text-center">
-              {embedUnavailableMessage}
+              Video playback is currently unavailable.
             </div>
           )}
         </div>
@@ -125,20 +102,18 @@ export default function WatchPage() {
 
             {isTV && (
               <div className="flex flex-wrap items-center gap-4 pt-2">
-                {!isAnime && (
-                  <label className="flex items-center gap-2 text-sm">
-                    Season
-                    <select
-                      value={season}
-                      onChange={(e) => { setSeason(Number(e.target.value)); setEpisode(1); }}
-                      className="bg-secondary text-foreground rounded-lg px-3 py-1.5 text-sm border border-border"
-                    >
-                      {Array.from({ length: ("number_of_seasons" in movie ? movie.number_of_seasons : 1) || 1 }, (_, i) => (
-                        <option key={i + 1} value={i + 1}>S{i + 1}</option>
-                      ))}
-                    </select>
-                  </label>
-                )}
+                <label className="flex items-center gap-2 text-sm">
+                  Season
+                  <select
+                    value={season}
+                    onChange={(e) => { setSeason(Number(e.target.value)); setEpisode(1); }}
+                    className="bg-secondary text-foreground rounded-lg px-3 py-1.5 text-sm border border-border"
+                  >
+                    {Array.from({ length: ("number_of_seasons" in movie ? movie.number_of_seasons : 1) || 1 }, (_, i) => (
+                      <option key={i + 1} value={i + 1}>S{i + 1}</option>
+                    ))}
+                  </select>
+                </label>
                 <label className="flex items-center gap-2 text-sm">
                   Episode
                   <input
@@ -148,38 +123,6 @@ export default function WatchPage() {
                     onChange={(e) => setEpisode(Number(e.target.value))}
                     className="bg-secondary text-foreground rounded-lg px-3 py-1.5 text-sm border border-border w-20"
                   />
-                </label>
-                {isAnime && (
-                  <label className="flex items-center gap-2 text-sm">
-                    Dub
-                    <input
-                      type="checkbox"
-                      checked={dub}
-                      onChange={(e) => setDub(e.target.checked)}
-                      className="h-4 w-4 accent-primary"
-                    />
-                  </label>
-                )}
-              </div>
-            )}
-
-            {!isAnime && (
-              <div className="pt-2">
-                <label className="flex items-center gap-2 text-sm">
-                  Embed API
-                  <select
-                    value={embedApiProvider}
-                    onChange={(e) => {
-                      const provider = resolveEmbedApiProvider(e.target.value);
-                      const nextParams = new URLSearchParams(searchParams);
-                      nextParams.set("embedApi", provider);
-                      setSearchParams(nextParams, { replace: true });
-                    }}
-                    className="bg-secondary text-foreground rounded-lg px-3 py-1.5 text-sm border border-border"
-                  >
-                    <option value="vidplus">VidPlus</option>
-                    <option value="vidsrc-embed">Vidsrc Embed</option>
-                  </select>
                 </label>
               </div>
             )}

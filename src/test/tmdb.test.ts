@@ -107,68 +107,21 @@ describe("tmdb – getTrending (all/week)", () => {
 });
 
 describe("tmdb embed URL builders", () => {
-  it("builds movie and TV URLs for vidplus", async () => {
+  it("builds movie and TV URLs for vidcore with autoplay enabled by default", async () => {
     const { buildMovieEmbedUrl, buildTVEpisodeEmbedUrl } = await import("@/lib/tmdb");
 
-    expect(buildMovieEmbedUrl("vidplus", 123)).toBe("https://player.vidplus.to/embed/movie/123");
-    expect(buildTVEpisodeEmbedUrl("vidplus", 123, 2, 5)).toBe("https://player.vidplus.to/embed/tv/123/2/5");
+    expect(buildMovieEmbedUrl(123)).toBe("https://vidcore.net/movie/123?autoPlay=true");
+    expect(buildTVEpisodeEmbedUrl(123, 2, 5)).toBe("https://vidcore.net/tv/123/2/5?autoPlay=true");
   });
 
-  it("builds movie and TV URLs for vidsrc-embed", async () => {
+  it("applies custom query parameters for movie and TV embeds", async () => {
     const { buildMovieEmbedUrl, buildTVEpisodeEmbedUrl } = await import("@/lib/tmdb");
 
-    expect(buildMovieEmbedUrl("vidsrc-embed", 123)).toBe("https://vidsrc-embed.ru/embed/movie/123");
-    expect(buildTVEpisodeEmbedUrl("vidsrc-embed", 123, 2, 5)).toBe("https://vidsrc-embed.ru/embed/tv/123/2/5");
-  });
-
-  it("resolves invalid providers to vidplus", async () => {
-    const { resolveEmbedApiProvider } = await import("@/lib/tmdb");
-
-    expect(resolveEmbedApiProvider("unknown-provider")).toBe("vidplus");
-    expect(resolveEmbedApiProvider(null)).toBe("vidplus");
-  });
-});
-
-describe("vidsrc embed list endpoints", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it("calls latest movies endpoint with page number", async () => {
-    vi.stubGlobal("fetch", mockFetch({ results: [] }));
-    const { getVidsrcEmbedLatestMovies } = await import("@/lib/tmdb");
-
-    await getVidsrcEmbedLatestMovies(2);
-
-    const calledUrl: string = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(calledUrl).toBe("https://vidsrc-embed.ru/movies/latest/page-2.json");
-  });
-
-  it("calls latest episodes endpoint with page number", async () => {
-    vi.stubGlobal("fetch", mockFetch({ results: [] }));
-    const { getVidsrcEmbedLatestEpisodes } = await import("@/lib/tmdb");
-
-    await getVidsrcEmbedLatestEpisodes(3);
-
-    const calledUrl: string = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(calledUrl).toBe("https://vidsrc-embed.ru/episodes/latest/page-3.json");
-  });
-
-  it("throws when page number is invalid", async () => {
-    vi.stubGlobal("fetch", mockFetch({ results: [] }));
-    const { getVidsrcEmbedLatestMovies, getVidsrcEmbedLatestEpisodes } = await import("@/lib/tmdb");
-
-    expect(() => getVidsrcEmbedLatestMovies(0)).toThrow(
-      "Page number must be an integer greater than or equal to 1."
-    );
-    expect(() => getVidsrcEmbedLatestMovies(1.5)).toThrow(
-      "Page number must be an integer greater than or equal to 1."
-    );
-    expect(() => getVidsrcEmbedLatestEpisodes(-1)).toThrow(
-      "Page number must be an integer greater than or equal to 1."
-    );
-    expect(() => getVidsrcEmbedLatestEpisodes(Number.NaN)).toThrow(
-      "Page number must be an integer greater than or equal to 1."
-    );
+    expect(
+      buildMovieEmbedUrl(533535, { theme: "16A085", autoPlay: false, sub: "en", hideServer: true })
+    ).toBe("https://vidcore.net/movie/533535?autoPlay=false&theme=16A085&sub=en&hideServer=true");
+    expect(
+      buildTVEpisodeEmbedUrl(63174, 1, 5, { autoNext: true, nextButton: true, server: "Server 1" })
+    ).toBe("https://vidcore.net/tv/63174/1/5?autoPlay=true&autoNext=true&nextButton=true&server=Server+1");
   });
 });
