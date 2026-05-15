@@ -124,4 +124,12 @@ describe("tmdb embed URL builders", () => {
       buildTVEpisodeEmbedUrl(63174, 1, 5, { autoNext: true, nextButton: true, server: "Server 1" })
     ).toBe("https://vidcore.net/tv/63174/1/5?autoPlay=true&autoNext=true&nextButton=true&server=Server+1");
   });
+
+  it("omits undefined parameters while preserving valid falsey values", async () => {
+    const { buildMovieEmbedUrl } = await import("@/lib/tmdb");
+
+    expect(
+      buildMovieEmbedUrl(533535, { title: false, poster: false, startAt: 0, theme: undefined })
+    ).toBe("https://vidcore.net/movie/533535?autoPlay=true&title=false&poster=false&startAt=0");
+  });
 });

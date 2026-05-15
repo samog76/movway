@@ -18,7 +18,8 @@ import { useState, useEffect } from "react";
 export default function WatchPage() {
   const { type, id } = useParams<{ type: string; id: string }>();
   const tmdbId = Number(id);
-  const isTV = type === "tv" || type === "anime";
+  const isAnime = type === "anime";
+  const isTV = type === "tv" || isAnime;
 
   const { data: movie } = useQuery<MovieDetails | TVDetails>({
     queryKey: ["details", type, tmdbId],
@@ -102,18 +103,20 @@ export default function WatchPage() {
 
             {isTV && (
               <div className="flex flex-wrap items-center gap-4 pt-2">
-                <label className="flex items-center gap-2 text-sm">
-                  Season
-                  <select
-                    value={season}
-                    onChange={(e) => { setSeason(Number(e.target.value)); setEpisode(1); }}
-                    className="bg-secondary text-foreground rounded-lg px-3 py-1.5 text-sm border border-border"
-                  >
-                    {Array.from({ length: ("number_of_seasons" in movie ? movie.number_of_seasons : 1) || 1 }, (_, i) => (
-                      <option key={i + 1} value={i + 1}>S{i + 1}</option>
-                    ))}
-                  </select>
-                </label>
+                {!isAnime && (
+                  <label className="flex items-center gap-2 text-sm">
+                    Season
+                    <select
+                      value={season}
+                      onChange={(e) => { setSeason(Number(e.target.value)); setEpisode(1); }}
+                      className="bg-secondary text-foreground rounded-lg px-3 py-1.5 text-sm border border-border"
+                    >
+                      {Array.from({ length: ("number_of_seasons" in movie ? movie.number_of_seasons : 1) || 1 }, (_, i) => (
+                        <option key={i + 1} value={i + 1}>S{i + 1}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <label className="flex items-center gap-2 text-sm">
                   Episode
                   <input
