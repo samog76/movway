@@ -46,6 +46,29 @@ export const VIDEO_PROVIDERS: VideoProvider[] = [
       `https://vidsrc.cc/v2/embed/tv/${id}/${season}/${episode}?autoPlay=true`,
   },
   {
+    // vsembed.ru — VidSrc mirror. TMDB ids; default subtitle language via ds_lang.
+    id: "vsembed",
+    name: "VSEmbed",
+    supportsSubtitles: true,
+    buildMovieUrl: (id, opts = {}) => {
+      const url = new URL(`https://vsembed.ru/embed/movie`);
+      url.searchParams.set("tmdb", String(id));
+      url.searchParams.set("autoplay", "1");
+      if (opts.sub) url.searchParams.set("ds_lang", opts.sub);
+      return url.toString();
+    },
+    buildTVUrl: (id, season, episode, opts = {}) => {
+      const url = new URL(`https://vsembed.ru/embed/tv`);
+      url.searchParams.set("tmdb", String(id));
+      url.searchParams.set("season", String(season));
+      url.searchParams.set("episode", String(episode));
+      url.searchParams.set("autoplay", "1");
+      url.searchParams.set("autonext", "1");
+      if (opts.sub) url.searchParams.set("ds_lang", opts.sub);
+      return url.toString();
+    },
+  },
+  {
     id: "vidlink",
     name: "VidLink",
     supportsSubtitles: false,
