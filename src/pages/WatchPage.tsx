@@ -6,11 +6,18 @@ import {
   getMovieCredits,
   getTVCredits,
   img,
-  buildMovieEmbedUrl,
-  buildTVEpisodeEmbedUrl,
   type MovieDetails,
   type TVDetails,
 } from "@/lib/tmdb";
+import {
+  VIDEO_PROVIDERS,
+  SUBTITLE_LANGUAGES,
+  getProvider,
+  loadProviderId,
+  saveProviderId,
+  loadSubtitle,
+  saveSubtitle,
+} from "@/lib/providers";
 import { upsertWatchEntry } from "@/lib/continueWatching";
 import { ArrowLeft, Star } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -38,6 +45,10 @@ export default function WatchPage() {
 
   const [season, setSeason] = useState(1);
   const [episode, setEpisode] = useState(1);
+  const [providerId, setProviderId] = useState(() => loadProviderId());
+  const [subtitle, setSubtitle] = useState(() => loadSubtitle());
+
+  const provider = getProvider(providerId);
 
   useEffect(() => {
     if (!movie) return;
@@ -57,9 +68,20 @@ export default function WatchPage() {
   }, [movie, season, episode, tmdbId, isTV]);
 
   const title = movie?.title || movie?.name || "Loading...";
+  const embedOptions = { sub: subtitle || undefined };
   const embedUrl = isTV
-    ? buildTVEpisodeEmbedUrl(tmdbId, season, episode)
-    : buildMovieEmbedUrl(tmdbId);
+    ? provider.buildTVUrl(tmdbId, season, episode, embedOptions)
+    : provider.buildMovieUrl(tmdbId, embedOptions);
+
+  const handleProviderChange = (id: string) => {
+    setProviderId(id);
+    saveProviderId(id);
+  };
+
+  const handleSubtitleChange = (code: string) => {
+    setSubtitle(code);
+    saveSubtitle(code);
+  };
 
   return (
     <div className="space-y-6">
@@ -71,10 +93,12 @@ export default function WatchPage() {
         <div className="aspect-video w-full">
           {embedUrl ? (
             <iframe
+              key={`${provider.id}-${subtitle}`}
               src={embedUrl}
               className="w-full h-full"
               allowFullScreen
-              allow="autoplay; fullscreen; picture-in-picture"
+              allow="autoplay; fullscreen; picture-in-picture; encrypted-media; clipboard-write"
+              referrerPolicy="origin"
               title={title}
             />
           ) : (
@@ -83,6 +107,42 @@ export default function WatchPage() {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Source</span>
+          <select
+            value={provider.id}
+            onChange={(e) => handleProviderChange(e.target.value)}
+            className="bg-secondary text-foreground rounded-lg px-3 py-1.5 text-sm border border-border"
+          >
+            {VIDEO_PROVIDERS.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Subtitles</span>
+          <select
+            value={subtitle}
+            onChange={(e) => handleSubtitleChange(e.target.value)}
+            disabled={!provider.supportsSubtitles}
+            title={provider.supportsSubtitles ? undefined : "This source doesn't support default subtitles"}
+            className="bg-secondary text-foreground rounded-lg px-3 py-1.5 text-sm border border-border disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {SUBTITLE_LANGUAGES.map((lang) => (
+              <option key={lang.code} value={lang.code}>{lang.label}</option>
+            ))}
+          </select>
+        </label>
+
+        {!provider.supportsSubtitles && (
+          <span className="text-xs text-muted-foreground">
+            Use the player's own subtitle menu for this source.
+          </span>
+        )}
       </div>
 
       {movie && (
