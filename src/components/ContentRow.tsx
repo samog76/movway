@@ -116,7 +116,10 @@ export default function ContentRow({ title, items, index, showDelete, onDelete }
           {title}
         </h2>
         <span className="h-px flex-1 bg-border" />
-        <div className="flex shrink-0 gap-px">
+        {/* Pointer affordance only. On a TV these steal every D-pad press
+            aimed at the posters behind them, so tv styles hide them and
+            moving focus scrolls the rail instead. */}
+        <div className="row-nav flex shrink-0 gap-px">
           <button
             onClick={() => scroll(-1)}
             className="border border-border p-2 text-muted-foreground transition-colors hover:border-acid hover:bg-acid hover:text-ink focus-visible:border-acid focus-visible:bg-acid focus-visible:text-ink"

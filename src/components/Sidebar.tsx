@@ -99,8 +99,8 @@ export default function Sidebar({
 
   return (
     <aside
-      className={`fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-border bg-[hsl(var(--sidebar-background))] transition-all duration-300 ${
-        collapsed ? "w-[76px]" : "w-[236px]"
+      className={`tv-rail fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-border bg-[hsl(var(--sidebar-background))] transition-all duration-300 ${
+        collapsed ? "w-[var(--rail-w-collapsed)]" : "w-[var(--rail-w)]"
       } ${mobileOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
     >
       {/* ── Masthead ── */}
@@ -114,8 +114,10 @@ export default function Sidebar({
                 WAY
               </span>
               <span className="mt-1.5 flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-acid animate-flicker" />
-                <span className="kicker text-muted-foreground">Screening Room</span>
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-acid animate-flicker" />
+                <span className="kicker rail-kicker truncate text-muted-foreground">
+                  Screening Room
+                </span>
               </span>
             </Link>
           ) : (
@@ -174,7 +176,7 @@ export default function Sidebar({
       </nav>
 
       {/* ── Footer: projector status ── */}
-      <div className="border-t border-border p-3">
+      <div className="rail-footer border-t border-border p-3">
         {!collapsed ? (
           <div className="border border-border bg-ink/60 p-3">
             <span className="kicker text-acid">Projector</span>

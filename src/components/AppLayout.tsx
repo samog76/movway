@@ -10,7 +10,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="grain-overlay relative flex min-h-screen bg-background">
       {/* ── Ambient projector beams: the only soft thing in the whole UI ── */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
+      <div aria-hidden className="ambient-beams pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -left-40 -top-40 h-[520px] w-[520px] rounded-full bg-violet/20 blur-[140px] animate-beam-drift" />
         <div
           className="absolute -right-32 top-1/3 h-[440px] w-[440px] rounded-full bg-acid/10 blur-[150px] animate-beam-drift"
@@ -37,8 +37,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       )}
 
       <main
-        className={`relative z-10 flex min-h-screen min-w-0 flex-1 flex-col overflow-x-hidden transition-all duration-300 ${
-          collapsed ? "md:ml-[76px]" : "md:ml-[236px]"
+        className={`tv-main relative z-10 flex min-h-screen min-w-0 flex-1 flex-col overflow-x-hidden transition-all duration-300 ${
+          collapsed ? "md:ml-[var(--rail-w-collapsed)]" : "md:ml-[var(--rail-w)]"
         }`}
       >
         <Marquee />

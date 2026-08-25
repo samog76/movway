@@ -37,8 +37,27 @@ for TV browsers. When detected it adds `.tv` to `<html>`, which turns on the
 margins, and a heavier focus ring.
 
 Because the focus ring *is* the cursor on a TV, every hover state in the app has a
-matching `focus-visible` state, and focus is scrolled into a comfortable position
-rather than left against a screen edge.
+matching `focus-visible` state.
+
+**D-pad navigation is ours, not the browser's.** Chromium moves focus in DOM
+order, which on a poster wall means landing on a row's scroll buttons and never
+reaching the posters — and anything scrolled outside a horizontal rail is
+unreachable entirely. `lib/tv.ts` instead picks the nearest focusable element in
+the direction pressed, keeps left/right inside the current row, and scrolls the
+rail as focus travels. Holding a direction switches from smooth to instant
+scrolling so fast movement never lags behind the remote.
+
+**TV mode is also a performance mode.** A TV SoC is far weaker than a phone, and
+this design's full-screen blended grain layer and three animated 140px blurs cost
+more than the entire scroll budget on that hardware. Both are disabled under
+`html.tv`, along with scroll snapping (which fights programmatic scrolling) and
+the pointer-only row arrows.
+
+Sizing is driven off the viewport (`clamp()` on the root font and the rail width)
+so the same build fits a 960×540 WebView and a 4K panel without a media query.
+
+To work on any of this without a TV in front of you, append `?tv=1` to the dev
+server URL — it forces TV mode on in a desktop browser.
 
 The native bundle is built with `VITE_NATIVE=1`, which switches the router to
 `HashRouter` — a WebView reload on a deep path has no server to fall back to
