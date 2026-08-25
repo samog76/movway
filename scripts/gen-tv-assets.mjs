@@ -41,6 +41,21 @@ const banner = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"
   <text x="36" y="123" font-family="${MONO}" font-size="10.5" letter-spacing="4.2" fill="${BONE}" fill-opacity="0.55">SCREENING ROOM</text>
 </svg>`;
 
+/**
+ * Launch splash. Capacitor ships a white plate with its own logo, which flashes
+ * white on a TV before the app paints — jarring against a black UI. Flat ink
+ * with a centred wordmark also survives being stretched to an odd aspect ratio.
+ */
+const splash = (w, h) => {
+  const unit = Math.min(w * 0.13, h * 0.2);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+  <rect width="${w}" height="${h}" fill="${INK}"/>
+  <rect x="0" y="0" width="${w}" height="${Math.max(3, h * 0.012)}" fill="${ACID}"/>
+  <text x="${w / 2}" y="${h / 2 + unit * 0.34}" text-anchor="middle" font-family="${SANS}" font-size="${unit}" font-weight="900" letter-spacing="${-unit * 0.05}" fill="${BONE}">MOV<tspan fill="${ACID}">/</tspan>WAY</text>
+  <text x="${w / 2}" y="${h / 2 + unit * 1.15}" text-anchor="middle" font-family="${MONO}" font-size="${unit * 0.19}" letter-spacing="${unit * 0.1}" fill="${BONE}" fill-opacity="0.5">SCREENING ROOM</text>
+</svg>`;
+};
+
 /** Adaptive-icon foreground: the M/ mark inside the 66% safe zone. */
 const iconForeground = (size) => `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 108 108">
   <text x="54" y="72" text-anchor="middle" font-family="${SANS}" font-size="52" font-weight="900" letter-spacing="-3" fill="${INK}">M<tspan fill="${INK}" fill-opacity="0.55">/</tspan></text>
@@ -82,4 +97,25 @@ for (const [density, legacy, adaptive] of DENSITIES) {
   write(dir, "ic_launcher_foreground.png", await png(iconForeground(adaptive), adaptive, adaptive));
 }
 
-console.log("wrote tv_banner.png (320×180) and launcher icons for 5 densities");
+// ── Splash screens: sizes match the Capacitor template they replace ──
+const SPLASHES = [
+  ["drawable", 480, 320],
+  ["drawable-land-mdpi", 480, 320],
+  ["drawable-land-hdpi", 800, 480],
+  ["drawable-land-xhdpi", 1280, 720],
+  ["drawable-land-xxhdpi", 1600, 960],
+  ["drawable-land-xxxhdpi", 1920, 1280],
+  ["drawable-port-mdpi", 320, 480],
+  ["drawable-port-hdpi", 480, 800],
+  ["drawable-port-xhdpi", 720, 1280],
+  ["drawable-port-xxhdpi", 960, 1600],
+  ["drawable-port-xxxhdpi", 1280, 1920],
+];
+
+for (const [dir, w, h] of SPLASHES) {
+  write(join(res, dir), "splash.png", await png(splash(w, h), w, h));
+}
+
+console.log(
+  `wrote tv_banner.png (320×180), launcher icons for 5 densities, and ${SPLASHES.length} splash screens`
+);
