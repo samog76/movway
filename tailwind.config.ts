@@ -14,10 +14,16 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ['Space Grotesk', 'sans-serif'],
-        body: ['Inter', 'sans-serif'],
+        display: ['Bricolage Grotesque', 'Arial Black', 'sans-serif'],
+        body: ['Manrope', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'ui-monospace', 'SF Mono', 'monospace'],
       },
       colors: {
+        acid: "hsl(var(--acid))",
+        flare: "hsl(var(--flare))",
+        violet: "hsl(var(--violet))",
+        bone: "hsl(var(--bone))",
+        ink: "hsl(var(--ink))",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -88,6 +94,7 @@ export default {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "beam-drift": "beam-drift 14s ease-in-out infinite",
       },
     },
   },

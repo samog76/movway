@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0A0A0B" />
+    <title>Movway for Google TV — Download</title>
+    <meta
+      name="description"
+      content="Movway turns your Google TV into a midnight screening room. Download the APK and sideload it in two minutes."
+    />
+
+    <meta property="og:title" content="Movway for Google TV" />
+    <meta
+      property="og:description"
+      content="A midnight screening room for your television. Download the APK."
+    />
+    <meta property="og:type" content="website" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      /* ═══ NITRATE — same design language as the app ═══ */
+      :root {
+        --ink: #0a0a0b;
+        --carbon: #131316;
+        --border: #26262e;
+        --acid: #ccff00;
+        --flare: #ff2e63;
+        --violet: #6e4bff;
+        --bone: #f4f1ea;
+        --muted: #8a8a96;
+        --display: "Bricolage Grotesque", "Arial Black", sans-serif;
+        --body: "Manrope", ui-sans-serif, system-ui, sans-serif;
+        --mono: "JetBrains Mono", ui-monospace, monospace;
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      html { scroll-behavior: smooth; }
+
+      body {
+        background: var(--ink);
+        color: var(--bone);
+        font-family: var(--body);
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+      }
+
+      ::selection { background: var(--acid); color: var(--ink); }
+
+      a { color: inherit; }
+
+      /* Film grain over everything */
+      body::after {
+        content: "";
+        position: fixed;
+        inset: -50%;
+        z-index: 9999;
+        pointer-events: none;
+        opacity: 0.15;
+        mix-blend-mode: overlay;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        animation: grain 640ms steps(3) infinite;
+      }
+      @keyframes grain {
+        0%, 100% { transform: translate(0, 0); }
+        33% { transform: translate(-2%, 1.5%); }
+        66% { transform: translate(1.5%, -1%); }
+      }
+
+      .kicker {
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: 500;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+      }
+
+      /* ── Marquee ── */
+      .marquee {
+        position: relative;
+        overflow: hidden;
+        background: var(--acid);
+        color: var(--ink);
+        border-bottom: 1px solid var(--border);
+      }
+      .marquee-track {
+        display: flex;
+        width: max-content;
+        padding: 7px 0;
+        animation: slide 38s linear infinite;
+      }
+      .marquee span { padding-right: 26px; white-space: nowrap; font-weight: 700; }
+      @keyframes slide { to { transform: translateX(-50%); } }
+
+      /* ── Ambient beams ── */
+      .beams { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+      .beam { position: absolute; border-radius: 50%; filter: blur(140px); }
+      .beam-1 { width: 520px; height: 520px; background: rgba(110, 75, 255, 0.22); top: -160px; left: -140px; }
+      .beam-2 { width: 460px; height: 460px; background: rgba(204, 255, 0, 0.10); top: 30%; right: -140px; }
+      .beam-3 { width: 400px; height: 400px; background: rgba(255, 46, 99, 0.10); bottom: -120px; left: 35%; }
+
+      .wrap { position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+      /* ── Hero ── */
+      header.hero { padding: 72px 0 56px; }
+      .brand {
+        font-family: var(--display);
+        font-size: 30px;
+        font-weight: 800;
+        letter-spacing: -0.05em;
+      }
+      .brand i { font-style: normal; color: var(--acid); }
+
+      .dot {
+        display: inline-block;
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        background: var(--acid);
+        margin-right: 8px;
+        vertical-align: middle;
+        animation: flicker 4.5s steps(1) infinite;
+      }
+      @keyframes flicker {
+        0%, 92%, 96%, 100% { opacity: 1; }
+        94%, 98% { opacity: 0.4; }
+      }
+
+      h1 {
+        font-family: var(--display);
+        font-size: clamp(2.75rem, 9vw, 6.5rem);
+        font-weight: 800;
+        line-height: 0.86;
+        letter-spacing: -0.05em;
+        text-transform: uppercase;
+        margin: 28px 0 0;
+        font-variation-settings: "opsz" 96;
+      }
+      h1 em { font-style: normal; color: var(--acid); }
+
+      .lede {
+        margin-top: 22px;
+        max-width: 46ch;
+        color: var(--muted);
+        font-size: 1.0625rem;
+        line-height: 1.65;
+      }
+
+      /* ── CTA ── */
+      .actions { margin-top: 38px; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        padding: 17px 28px;
+        border: 2px solid var(--acid);
+        background: var(--acid);
+        color: var(--ink);
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        text-decoration: none;
+        transition: transform 180ms ease, box-shadow 180ms ease;
+      }
+      .btn:hover, .btn:focus-visible {
+        transform: translate(-2px, -2px);
+        box-shadow: 6px 6px 0 0 var(--flare);
+        outline: none;
+      }
+
+      .btn-ghost {
+        background: transparent;
+        border-color: var(--border);
+        color: var(--bone);
+      }
+      .btn-ghost:hover, .btn-ghost:focus-visible {
+        border-color: var(--acid);
+        color: var(--acid);
+        box-shadow: none;
+        transform: none;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 20px;
+      }
+      .chip {
+        border: 1px solid var(--border);
+        padding: 5px 10px;
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        color: var(--muted);
+        text-transform: uppercase;
+      }
+
+      /* ── Sections ── */
+      section { padding: 72px 0; }
+
+      .sec-head { display: flex; align-items: center; gap: 16px; margin-bottom: 34px; }
+      .sec-num { font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--acid); }
+      .sec-head h2 {
+        font-family: var(--display);
+        font-size: clamp(1.35rem, 3.4vw, 2rem);
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: -0.03em;
+      }
+      .rule { flex: 1; height: 1px; background: var(--border); }
+
+      /* ── Steps ── */
+      .steps { display: grid; gap: 2px; }
+      .step {
+        display: grid;
+        grid-template-columns: 62px 1fr;
+        gap: 20px;
+        padding: 24px 22px;
+        border: 1px solid var(--border);
+        background: rgba(19, 19, 22, 0.55);
+        transition: border-color 160ms ease;
+      }
+      .step:hover { border-color: var(--acid); }
+      .step-n {
+        font-family: var(--display);
+        font-size: 34px;
+        font-weight: 800;
+        line-height: 1;
+        -webkit-text-stroke: 1.5px rgba(244, 241, 234, 0.35);
+        color: transparent;
+      }
+      .step h3 { font-family: var(--body); font-size: 1rem; font-weight: 700; margin-bottom: 7px; }
+      .step p { color: var(--muted); font-size: 0.9rem; line-height: 1.7; }
+      .step code {
+        font-family: var(--mono);
+        font-size: 0.8rem;
+        background: var(--ink);
+        border: 1px solid var(--border);
+        padding: 2px 7px;
+        color: var(--acid);
+        white-space: nowrap;
+      }
+
+      /* ── Features ── */
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 2px; }
+      .cell { padding: 26px 22px; border: 1px solid var(--border); background: rgba(19,19,22,0.55); }
+      .cell .kicker { color: var(--acid); }
+      .cell h3 { font-family: var(--display); font-size: 1.15rem; font-weight: 800; margin: 12px 0 8px; letter-spacing: -0.02em; }
+      .cell p { color: var(--muted); font-size: 0.875rem; line-height: 1.7; }
+
+      /* ── Notice ── */
+      .notice {
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--flare);
+        background: rgba(255, 46, 99, 0.05);
+        padding: 20px 22px;
+      }
+      .notice p { color: var(--muted); font-size: 0.875rem; line-height: 1.7; margin-top: 7px; }
+
+      /* ── Footer ── */
+      footer { border-top: 1px solid var(--border); padding: 44px 0 60px; margin-top: 40px; }
+      .foot { display: flex; flex-wrap: wrap; gap: 22px; justify-content: space-between; align-items: flex-end; }
+      .foot p.small { font-family: var(--mono); font-size: 10px; color: rgba(138,138,150,0.65); line-height: 1.8; }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation: none !important; transition: none !important; }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="beams" aria-hidden="true">
+      <div class="beam beam-1"></div>
+      <div class="beam beam-2"></div>
+      <div class="beam beam-3"></div>
+    </div>
+
+    <!-- ── Marquee ── -->
+    <div class="marquee" aria-hidden="true">
+      <div class="marquee-track">
+        <span class="kicker">Now Showing ✳</span><span class="kicker">Google TV ✳</span>
+        <span class="kicker">Android TV ✳</span><span class="kicker">No Ads, Ever ✳</span>
+        <span class="kicker">Free Download ✳</span><span class="kicker">Sideload in 2 Minutes ✳</span>
+        <span class="kicker">Now Showing ✳</span><span class="kicker">Google TV ✳</span>
+        <span class="kicker">Android TV ✳</span><span class="kicker">No Ads, Ever ✳</span>
+        <span class="kicker">Free Download ✳</span><span class="kicker">Sideload in 2 Minutes ✳</span>
+      </div>
+    </div>
+
+    <div class="wrap">
+      <!-- ── Hero ── -->
+      <header class="hero">
+        <div class="brand">MOV<i>/</i>WAY</div>
+        <p class="kicker" style="color: var(--muted); margin-top: 10px">
+          <span class="dot"></span>For Google TV &amp; Android TV
+        </p>
+
+        <h1>Your TV<br />after <em>midnight</em></h1>
+
+        <p class="lede">
+          Movies, series and anime on the big screen — built for the remote in your hand.
+          Every poster, row and control is reachable with the D-pad, sized to read from
+          the sofa, and wrapped in a projection-room interface that stays out of the way.
+        </p>
+
+        <div class="actions">
+          <a class="btn" href="/movway.apk" download>
+            ↓ Download APK
+          </a>
+          <a class="btn btn-ghost" href="#install">Install Guide</a>
+        </div>
+
+        <div class="meta">
+          <span class="chip" id="chip-version">Version 1.0.0</span>
+          <span class="chip" id="chip-size">APK</span>
+          <span class="chip">Android 5.1+</span>
+          <span class="chip">arm · arm64 · x86</span>
+        </div>
+      </header>
+
+      <!-- ── Install ── -->
+      <section id="install">
+        <div class="sec-head">
+          <span class="sec-num">01</span>
+          <h2>Install on Google TV</h2>
+          <span class="rule"></span>
+        </div>
+
+        <div class="steps">
+          <div class="step">
+            <span class="step-n">01</span>
+            <div>
+              <h3>Allow unknown apps</h3>
+              <p>
+                On your TV open <code>Settings › System › About</code> and click
+                <strong>Android TV OS build</strong> seven times to unlock Developer options.
+                Then go to <code>Settings › Apps › Security &amp; restrictions</code> and turn on
+                <strong>Unknown sources</strong> for the app you'll install from.
+              </p>
+            </div>
+          </div>
+
+          <div class="step">
+            <span class="step-n">02</span>
+            <div>
+              <h3>Get the file onto the TV</h3>
+              <p>
+                Install <strong>Downloader by AFTVnews</strong> from the Google Play Store on your
+                TV, then enter this page's address and pick the download. Prefer a cable?
+                Sideload from a computer with
+                <code>adb install movway.apk</code>.
+              </p>
+            </div>
+          </div>
+
+          <div class="step">
+            <span class="step-n">03</span>
+            <div>
+              <h3>Open it from the home row</h3>
+              <p>
+                Movway installs with a proper TV banner, so it appears alongside your other apps
+                on the Google TV home screen. Navigate with the D-pad, press
+                <strong>select</strong> to play, and <strong>back</strong> to return.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="notice" style="margin-top: 26px">
+          <span class="kicker" style="color: var(--flare)">Heads up</span>
+          <p>
+            This APK is distributed outside the Play Store, so Android will warn you before
+            installing — that's expected for sideloaded apps. Movway streams from third-party
+            sources and is intended for personal use.
+          </p>
+        </div>
+      </section>
+
+      <!-- ── Features ── -->
+      <section>
+        <div class="sec-head">
+          <span class="sec-num">02</span>
+          <h2>Built for the couch</h2>
+          <span class="rule"></span>
+        </div>
+
+        <div class="grid">
+          <div class="cell">
+            <span class="kicker">D-Pad Native</span>
+            <h3>Remote first</h3>
+            <p>
+              Every control takes focus, and whatever you land on scrolls itself into a
+              comfortable spot instead of hiding at the screen edge.
+            </p>
+          </div>
+          <div class="cell">
+            <span class="kicker">10-Foot UI</span>
+            <h3>Reads from the sofa</h3>
+            <p>
+              Type, focus rings and spacing all scale up on TV, with safe margins so nothing
+              is lost to overscan on older panels.
+            </p>
+          </div>
+          <div class="cell">
+            <span class="kicker">Catalogue</span>
+            <h3>Films, series, anime</h3>
+            <p>
+              Trending, popular and top-rated rows pulled live from TMDB, plus search and a
+              continue-watching shelf that remembers where you stopped.
+            </p>
+          </div>
+          <div class="cell">
+            <span class="kicker">Playback</span>
+            <h3>Pick your source</h3>
+            <p>
+              Multiple playback sources with subtitle language selection, and season and
+              episode controls for series.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Footer ── -->
+      <footer>
+        <div class="foot">
+          <div>
+            <div class="brand" style="font-size: 24px">MOV<i>/</i>WAY</div>
+            <p class="kicker" style="color: var(--muted); margin-top: 8px">
+              Reel data by TMDB · Always midnight
+            </p>
+          </div>
+          <p class="small">
+            NO. 001 — NITRATE EDITION<br />
+            NOT AFFILIATED WITH GOOGLE OR TMDB
+          </p>
+        </div>
+      </footer>
+    </div>
+
+    <script>
+      // Show the real APK size so the download button never lies about it.
+      fetch("/movway.apk", { method: "HEAD" })
+        .then((res) => {
+          const bytes = Number(res.headers.get("content-length"));
+          if (!res.ok || !bytes) return;
+          document.getElementById("chip-size").textContent =
+            (bytes / 1024 / 1024).toFixed(1) + " MB APK";
+        })
+        .catch(() => {});
+    </script>
+  </body>
+</html>
