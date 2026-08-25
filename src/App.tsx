@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, HashRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,12 +18,19 @@ const queryClient = new QueryClient({
   },
 });
 
+/**
+ * The native (Android TV) bundle is served off the local filesystem, where a
+ * WebView reload on a deep path like /search has no server to fall back to
+ * index.html. Hash routing survives that; the web build keeps clean URLs.
+ */
+const Router = import.meta.env.VITE_NATIVE ? HashRouter : BrowserRouter;
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <Router>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/search" element={<AppLayout><SearchPage /></AppLayout>} />
@@ -31,7 +38,7 @@ const App = () => (
           <Route path="/browse/:category" element={<AppLayout><BrowsePage /></AppLayout>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </BrowserRouter>
+      </Router>
     </TooltipProvider>
   </QueryClientProvider>
 );

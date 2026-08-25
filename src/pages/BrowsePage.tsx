@@ -1,7 +1,15 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { getPopularMovies, getPopularTV, getAnime, getTrendingMovies, getTrendingTV, img, Movie } from "@/lib/tmdb";
-import { Star } from "lucide-react";
+import {
+  getPopularMovies,
+  getPopularTV,
+  getAnime,
+  getTrendingMovies,
+  getTrendingTV,
+  Movie,
+} from "@/lib/tmdb";
+import { PosterCard } from "@/components/ContentRow";
+import PageHeader from "@/components/PageHeader";
 
 interface CategoryConfig {
   label: string;
@@ -11,7 +19,7 @@ interface CategoryConfig {
 
 const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
   movie: { label: "Movies", queryKey: "browse-movie", fetcher: getPopularMovies },
-  tv: { label: "TV Shows", queryKey: "browse-tv", fetcher: getPopularTV },
+  tv: { label: "Series", queryKey: "browse-tv", fetcher: getPopularTV },
   anime: { label: "Anime", queryKey: "browse-anime", fetcher: getAnime },
   "trending-movie": {
     label: "Trending Movies",
@@ -19,11 +27,29 @@ const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
     fetcher: getTrendingMovies,
   },
   "trending-tv": {
-    label: "Trending TV Shows",
+    label: "Trending Series",
     queryKey: "browse-trending-tv",
     fetcher: getTrendingTV,
   },
 };
+
+const GRID =
+  "grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 md:gap-4 lg:grid-cols-5 xl:grid-cols-6";
+
+/** Shared empty/error state — a blank film frame with a mono caption. */
+function Placard({ code, title, note }: { code: string; title: string; note: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center border border-dashed border-border py-24 text-center">
+      <span className="font-display text-6xl font-extrabold leading-none text-stroke">{code}</span>
+      <p className="mt-5 font-display text-xl font-extrabold uppercase tracking-tight text-bone">
+        {title}
+      </p>
+      <p className="mt-2 max-w-sm font-mono text-[11px] leading-relaxed text-muted-foreground">
+        {note}
+      </p>
+    </div>
+  );
+}
 
 export default function BrowsePage() {
   const { category } = useParams<{ category: string }>();
@@ -37,72 +63,67 @@ export default function BrowsePage() {
 
   if (!config) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-        <p className="text-lg font-medium">Coming Soon</p>
-        <p className="text-sm mt-2">This section is not available yet.</p>
+      <div className="space-y-8">
+        <PageHeader kicker="Catalogue" title={category ?? "Unknown"} />
+        <Placard
+          code="00"
+          title="Coming Soon"
+          note="This reel hasn't been threaded through the projector yet. Check back for the next screening."
+        />
       </div>
     );
   }
 
-  if (isError) {
-    return (
-      <div className="space-y-6">
-        <h1 className="font-display text-2xl md:text-3xl font-bold">{config.label}</h1>
-        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-          <p className="text-lg font-medium">Failed to load content</p>
-          <p className="text-sm mt-2">Could not fetch data from TMDB. Please try again later.</p>
-        </div>
-      </div>
-    );
-  }
+  const count = data?.results?.length ?? 0;
 
   return (
-    <div className="space-y-6">
-      <h1 className="font-display text-2xl md:text-3xl font-bold">{config.label}</h1>
+    <div className="space-y-8">
+      <PageHeader
+        kicker="Catalogue"
+        title={config.label}
+        aside={
+          count > 0 ? (
+            <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+              {String(count).padStart(3, "0")} TITLES
+            </span>
+          ) : undefined
+        }
+      />
 
-      {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <div key={i} className="rounded-xl overflow-hidden aspect-[2/3] bg-secondary/30 animate-pulse" />
+      {isError ? (
+        <Placard
+          code="404"
+          title="Reel Jammed"
+          note="Could not fetch this catalogue from TMDB. Give the projectionist a moment and try again."
+        />
+      ) : isLoading ? (
+        <div className={GRID}>
+          {Array.from({ length: 18 }).map((_, i) => (
+            <div
+              key={i}
+              className="aspect-[2/3] animate-pulse border border-border bg-card"
+              style={{ animationDelay: `${i * 40}ms` }}
+            />
           ))}
         </div>
-      ) : data && data.results.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {data.results.map((item) => {
-            const type =
-              item.media_type === "tv" ||
-              !!item.first_air_date ||
-              (item.name && !item.title)
-                ? "tv"
-                : "movie";
-            return (
-              <Link
-                key={item.id}
-                to={`/watch/${type}/${item.id}`}
-                className="group/card"
-              >
-                <div className="relative rounded-xl overflow-hidden aspect-[2/3]">
-                  <img
-                    src={img(item.poster_path, "w342")}
-                    alt={item.title || item.name}
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover/card:scale-105"
-                    loading="lazy"
-                  />
-                  <div className="absolute top-2 left-2 flex items-center gap-1 bg-background/80 backdrop-blur-sm text-xs font-semibold px-2 py-1 rounded-md">
-                    <Star size={12} className="text-primary fill-primary" />
-                    {item.vote_average ? item.vote_average.toFixed(1) : "N/A"}
-                  </div>
-                </div>
-                <p className="mt-2 text-sm font-medium truncate">{item.title || item.name}</p>
-              </Link>
-            );
-          })}
+      ) : count > 0 ? (
+        <div className={GRID}>
+          {data!.results.map((item, i) => (
+            <div
+              key={item.id}
+              className="reveal"
+              style={{ animationDelay: `${Math.min(i * 28, 500)}ms` }}
+            >
+              <PosterCard item={item} rank={i + 1} />
+            </div>
+          ))}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-          <p className="text-lg font-medium">No results found</p>
-          <p className="text-sm mt-2">There are no items to display in this category.</p>
-        </div>
+        <Placard
+          code="—"
+          title="Empty House"
+          note="No titles are screening in this category right now."
+        />
       )}
     </div>
   );

@@ -2,62 +2,66 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOVWAY — "NITRATE"
+   A midnight repertory cinema rendered in acid light: film-black paper,
+   marquee lime, print-misregistration shadows, and grain over everything.
+   ═══════════════════════════════════════════════════════════════════════ */
 
 @layer base {
   :root {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 96%;
+    /* ── Core surfaces: warm film black, never navy ── */
+    --background: 240 6% 4%;
+    --foreground: 44 30% 94%;
 
-    --card: 222 41% 10%;
-    --card-foreground: 210 40% 96%;
+    --card: 240 7% 8%;
+    --card-foreground: 44 30% 94%;
 
-    --popover: 222 41% 10%;
-    --popover-foreground: 210 40% 96%;
+    --popover: 240 8% 6%;
+    --popover-foreground: 44 30% 94%;
 
-    --primary: 38 92% 55%;
-    --primary-foreground: 222 47% 6%;
+    /* ── Marquee lime: the signal color. Unclaimed by any streaming brand. ── */
+    --primary: 72 100% 50%;
+    --primary-foreground: 240 10% 4%;
 
-    --secondary: 222 30% 16%;
-    --secondary-foreground: 210 40% 90%;
+    --secondary: 240 8% 12%;
+    --secondary-foreground: 44 20% 88%;
 
-    --muted: 222 30% 14%;
-    --muted-foreground: 215 20% 55%;
+    --muted: 240 8% 14%;
+    --muted-foreground: 240 6% 58%;
 
-    --accent: 38 92% 55%;
-    --accent-foreground: 222 47% 6%;
+    --accent: 72 100% 50%;
+    --accent-foreground: 240 10% 4%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 343 100% 59%;
+    --destructive-foreground: 44 30% 96%;
 
-    --border: 222 30% 18%;
-    --input: 222 30% 18%;
-    --ring: 38 92% 55%;
+    --border: 240 9% 16%;
+    --input: 240 9% 16%;
+    --ring: 72 100% 50%;
 
-    --radius: 0.75rem;
+    /* Brutalist: corners are nearly square. */
+    --radius: 0.25rem;
 
-    --sidebar-bg: 222 47% 8%;
-    --sidebar-fg: 210 40% 80%;
-    --sidebar-active: 38 92% 55%;
-    --sidebar-hover: 222 30% 14%;
+    /* ── Extended palette ── */
+    --acid: 72 100% 50%; /* #CCFF00 marquee lime */
+    --flare: 343 100% 59%; /* #FF2E63 hot signal   */
+    --violet: 252 100% 65%; /* #6E4BFF projector beam */
+    --bone: 44 30% 94%; /* #F4F1EA warm paper   */
+    --ink: 240 6% 4%;
 
-    --gradient-hero: linear-gradient(135deg, hsl(222 47% 6% / 0.3), hsl(222 47% 6% / 0.95));
-    --gradient-card: linear-gradient(180deg, hsl(222 41% 10%) 0%, hsl(222 47% 8%) 100%);
+    --sidebar-background: 240 8% 5%;
+    --sidebar-foreground: 240 6% 62%;
+    --sidebar-primary: 72 100% 50%;
+    --sidebar-primary-foreground: 240 10% 4%;
+    --sidebar-accent: 240 8% 12%;
+    --sidebar-accent-foreground: 44 20% 88%;
+    --sidebar-border: 240 9% 16%;
+    --sidebar-ring: 72 100% 50%;
 
-    --shadow-card: 0 4px 24px -4px hsl(0 0% 0% / 0.4);
-    --shadow-glow: 0 0 20px hsl(38 92% 55% / 0.15);
-
-    --font-display: 'Space Grotesk', sans-serif;
-    --font-body: 'Inter', sans-serif;
-
-    --sidebar-background: 222 47% 8%;
-    --sidebar-foreground: 210 40% 80%;
-    --sidebar-primary: 38 92% 55%;
-    --sidebar-primary-foreground: 222 47% 6%;
-    --sidebar-accent: 222 30% 14%;
-    --sidebar-accent-foreground: 210 40% 90%;
-    --sidebar-border: 222 30% 18%;
-    --sidebar-ring: 38 92% 55%;
+    --font-display: "Bricolage Grotesque", "Arial Black", sans-serif;
+    --font-body: "Manrope", ui-sans-serif, system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
   }
 }
 
@@ -66,13 +70,98 @@
     @apply border-border;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-body);
+    font-feature-settings: "ss01", "cv01";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: var(--font-display);
+    font-variation-settings: "opsz" 48;
+    letter-spacing: -0.03em;
+  }
+
+  ::selection {
+    background: hsl(var(--acid));
+    color: hsl(var(--ink));
+  }
+
+  /* Thin acid scrollbar — part of the furniture, not an afterthought. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--ink));
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border: 2px solid hsl(var(--ink));
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--acid) / 0.55);
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--acid));
+    outline-offset: 2px;
+  }
+
+  /* Focused elements are never allowed to sit flush against a screen edge —
+     on a D-pad this is the difference between usable and disorienting. */
+  a,
+  button,
+  input,
+  select {
+    scroll-margin: 96px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GOOGLE TV — 10-foot UI
+   Applied when lib/tv.ts detects a TV shell and sets html.tv. On a TV the
+   focus ring IS the cursor, so it has to be impossible to lose.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@layer base {
+  html.tv {
+    /* Tailwind's scale is rem-based, so this lifts the whole UI at once. */
+    font-size: 18px;
+  }
+
+  /* Overscan: some panels crop up to 5% of each edge. */
+  html.tv .tv-safe {
+    padding-left: 3.5vw;
+    padding-right: 3.5vw;
+  }
+
+  html.tv :focus-visible {
+    outline: 3px solid hsl(var(--acid));
+    outline-offset: 4px;
+  }
+
+  /* No pointer on a TV — reclaim the gutter. */
+  html.tv ::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+
+  /* Hover states are unreachable without a pointer; make sure nothing is
+     hover-only by keeping transitions snappy enough to read at distance. */
+  html.tv * {
+    transition-duration: 140ms;
   }
 }
 
@@ -84,10 +173,171 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  /* ── Film grain: one fixed layer over the entire app ── */
+  .grain-overlay::after {
+    content: "";
+    position: fixed;
+    inset: -50%;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0.16;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    animation: grain-shift 640ms steps(3) infinite;
+  }
+
+  /* ── Projector scanlines ── */
+  .scanlines::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0 2px,
+      hsl(var(--ink) / 0.32) 2px 4px
+    );
+    opacity: 0.35;
+  }
+
+  /* ── Brutalist hard shadow (print misregistration) ── */
+  .shadow-hard {
+    box-shadow: 4px 4px 0 0 hsl(var(--acid));
+  }
+  .shadow-hard-lg {
+    box-shadow: 8px 8px 0 0 hsl(var(--acid));
+  }
+  .shadow-hard-flare {
+    box-shadow: 6px 6px 0 0 hsl(var(--flare));
+  }
+
+  .glow-acid {
+    box-shadow: 0 0 0 1px hsl(var(--acid) / 0.4), 0 0 32px -4px hsl(var(--acid) / 0.35);
+  }
+
+  /* Outlined display type — used for grid-breaking numerals */
+  .text-stroke {
+    -webkit-text-stroke: 1.5px hsl(var(--bone) / 0.35);
+    color: transparent;
+  }
+  .text-stroke-acid {
+    -webkit-text-stroke: 2px hsl(var(--acid));
+    color: transparent;
+  }
+
+  /* Mono kicker labels — the "technical data" texture of the whole UI */
+  .kicker {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+
+  .font-variation-tight {
+    font-variation-settings: "opsz" 96;
+  }
+
+  /* Perforated film-strip edge */
+  .film-perf {
+    background-image: radial-gradient(
+      circle at 50% 50%,
+      hsl(var(--bone) / 0.16) 0 2.2px,
+      transparent 2.4px
+    );
+    background-size: 100% 18px;
+    background-repeat: repeat-y;
+  }
+
+  /* Staggered entrance — the page assembles itself on load */
+  .reveal {
+    animation: reveal-up 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .marquee-track {
+    animation: marquee 38s linear infinite;
+  }
+
+  .animate-flicker {
+    animation: flicker 4.5s steps(1) infinite;
+  }
 }
 
-/* Prevent horizontal overflow at the root level */
-html, body {
+@keyframes grain-shift {
+  0% {
+    transform: translate(0, 0);
+  }
+  33% {
+    transform: translate(-2%, 1.5%);
+  }
+  66% {
+    transform: translate(1.5%, -1%);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Marquee bulbs never quite behave */
+@keyframes flicker {
+  0%,
+  92%,
+  96%,
+  100% {
+    opacity: 1;
+  }
+  94%,
+  98% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes beam-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translate3d(4%, -3%, 0) scale(1.12);
+    opacity: 0.75;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+html,
+body {
   overflow-x: hidden;
   max-width: 100%;
 }
