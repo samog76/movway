@@ -7,9 +7,9 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        // 8.10.x is the first line that accepts compileSdk 36 while still
-        // running on the Gradle 8.11.1 wrapper Capacitor ships.
-        classpath 'com.android.tools.build:gradle:8.10.1'
+        // Must match the version @capacitor/android pins in its own module
+        // buildscript, or Gradle resolves two AGP classpaths.
+        classpath 'com.android.tools.build:gradle:8.7.2'
         classpath 'com.google.gms:google-services:4.4.2'
 
         // NOTE: Do not place your application dependencies here; they belong
