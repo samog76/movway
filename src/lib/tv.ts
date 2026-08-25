@@ -86,7 +86,13 @@ function candidates(): Candidate[] {
  * travel plus a heavy penalty for drifting off-axis, so moving right along a
  * row stays in that row instead of diving into the one below.
  */
-function cost(from: DOMRect, to: DOMRect, dir: Direction): number | null {
+function cost(
+  from: DOMRect,
+  to: DOMRect,
+  dir: Direction,
+  /** Require left/right to stay on the same visual row. */
+  sameRowOnly: boolean
+): number | null {
   // A little slack so items that overlap by a pixel still count as "ahead".
   const SLACK = 8;
   const OFF_AXIS_WEIGHT = 3;
@@ -95,11 +101,14 @@ function cost(from: DOMRect, to: DOMRect, dir: Direction): number | null {
   let offAxis: number;
 
   if (dir === "right" || dir === "left") {
-    // Left/right must stay in the current row. Without this, running off the
-    // end of a short rail throws focus into whatever sits further right on a
-    // different row, which reads as the remote jumping at random.
-    const overlap = Math.min(from.bottom, to.bottom) - Math.max(from.top, to.top);
-    if (overlap < Math.min(from.height, to.height) * 0.5) return null;
+    // Prefer staying on the current row, so running along a rail never drops
+    // into the one below. This is only the first pass though: applied
+    // absolutely it strands you in the sidebar, where nothing in the content
+    // area lines up with a nav item.
+    if (sameRowOnly) {
+      const overlap = Math.min(from.bottom, to.bottom) - Math.max(from.top, to.top);
+      if (overlap < Math.min(from.height, to.height) * 0.5) return null;
+    }
 
     ahead = dir === "right" ? to.left - from.right : from.left - to.right;
     offAxis = Math.abs((to.top + to.bottom) / 2 - (from.top + from.bottom) / 2);
@@ -145,19 +154,26 @@ function move(dir: Direction): boolean {
   }
 
   const from = active.getBoundingClientRect();
-  let best: HTMLElement | null = null;
-  let bestCost = Infinity;
 
-  for (const { el, rect } of all) {
-    if (el === active) continue;
-    const c = cost(from, rect, dir);
-    if (c === null || c >= bestCost) continue;
-    bestCost = c;
-    best = el;
-  }
+  // Two passes: keep to the current row if anything is there, otherwise take
+  // the nearest thing in that direction — which is what carries you out of the
+  // sidebar and into the posters.
+  const pick = (sameRowOnly: boolean): HTMLElement | null => {
+    let best: HTMLElement | null = null;
+    let bestCost = Infinity;
+    for (const { el, rect } of all) {
+      if (el === active) continue;
+      const c = cost(from, rect, dir, sameRowOnly);
+      if (c === null || c >= bestCost) continue;
+      bestCost = c;
+      best = el;
+    }
+    return best;
+  };
 
-  if (!best) return false;
-  reveal(best);
+  const target = pick(true) ?? pick(false);
+  if (!target) return false;
+  reveal(target);
   return true;
 }
 
@@ -166,14 +182,73 @@ const DIRECTIONS: Record<string, Direction> = {
   ArrowDown: "down",
   ArrowLeft: "left",
   ArrowRight: "right",
+  // Some WebViews report the pre-standard names.
+  Up: "up",
+  Down: "down",
+  Left: "left",
+  Right: "right",
 };
+
+/**
+ * Android delivers the D-pad as KEYCODE_DPAD_* (19–22), and a good number of
+ * TV WebView builds surface those with `key` set to "Unidentified" rather than
+ * "ArrowUp". Matching on `key` alone therefore does nothing on exactly the
+ * hardware this is written for: the handler bails and Chromium's DOM-order
+ * focus takes over, which reaches a few buttons and never the posters.
+ */
+const KEY_CODES: Record<number, Direction> = {
+  38: "up",
+  40: "down",
+  37: "left",
+  39: "right",
+  19: "up", // KEYCODE_DPAD_UP
+  20: "down", // KEYCODE_DPAD_DOWN
+  21: "left", // KEYCODE_DPAD_LEFT
+  22: "right", // KEYCODE_DPAD_RIGHT
+};
+
+/** KEYCODE_DPAD_CENTER / KEYCODE_ENTER / KEYCODE_NUMPAD_ENTER. */
+const SELECT_CODES = new Set([23, 66, 160]);
+
+function directionOf(event: KeyboardEvent): Direction | null {
+  return DIRECTIONS[event.key] ?? KEY_CODES[event.keyCode || event.which] ?? null;
+}
+
+/** Last key seen, surfaced in the rail on TV so a dead remote is diagnosable. */
+function recordKey(event: KeyboardEvent, handled: boolean) {
+  const readout = document.getElementById("tv-key-readout");
+  if (!readout) return;
+  const name = event.key && event.key !== "Unidentified" ? event.key : `#${event.keyCode}`;
+  readout.textContent = `${name}${handled ? "" : " ·skip"}`;
+}
+
+/** The same event reaches both listeners below; act on it once. */
+const seen = new WeakSet<KeyboardEvent>();
 
 function onKeyDown(event: KeyboardEvent) {
   if (event.altKey || event.ctrlKey || event.metaKey) return;
-  const dir = DIRECTIONS[event.key];
-  if (!dir) return;
+  if (seen.has(event)) return;
+  seen.add(event);
 
   const active = document.activeElement as HTMLElement | null;
+
+  // D-pad centre does not always arrive as Enter, which leaves the remote able
+  // to move but not to choose anything.
+  if (SELECT_CODES.has(event.keyCode || event.which) && event.key !== "Enter") {
+    if (active && active !== document.body && active.matches(FOCUSABLE_SELECTOR)) {
+      recordKey(event, true);
+      event.preventDefault();
+      active.click();
+      return;
+    }
+  }
+
+  const dir = directionOf(event);
+  if (!dir) {
+    recordKey(event, false);
+    return;
+  }
+
   const tag = active?.tagName;
 
   // Native controls own the arrows they actually use: a select opens its list,
@@ -187,7 +262,9 @@ function onKeyDown(event: KeyboardEvent) {
     if (type === "range") return;
   }
 
-  if (move(dir)) event.preventDefault();
+  const moved = move(dir);
+  recordKey(event, moved);
+  if (moved) event.preventDefault();
 }
 
 // ── Focus seeding ────────────────────────────────────────────────────────────
@@ -211,6 +288,8 @@ function seedFocus() {
 function onFocusIn(event: FocusEvent) {
   const el = event.target as HTMLElement | null;
   if (!el?.matches?.(FOCUSABLE_SELECTOR)) return;
+  // reveal() already positioned this one; scrolling again would fight it.
+  if (performance.now() - lastMoveAt < 80) return;
   el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
 }
 
@@ -228,9 +307,14 @@ export function initTvSupport(): void {
 
   document.documentElement.classList.add("tv");
 
-  // Spatial navigation replaces focusin scrolling entirely on a TV; running
-  // both would fight over the scroll position.
+  // Capture phase on both targets: some WebView builds deliver key events to
+  // the window rather than the document, and a missed listener here is the
+  // difference between a working remote and a dead one.
   document.addEventListener("keydown", onKeyDown, true);
+  window.addEventListener("keydown", onKeyDown, true);
+
+  // Safety net: if anything else ends up moving focus, at least reveal it.
+  document.addEventListener("focusin", onFocusIn);
 
   const seedSoon = () => window.setTimeout(seedFocus, 350);
   seedSoon();

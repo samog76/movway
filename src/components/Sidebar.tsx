@@ -118,6 +118,13 @@ export default function Sidebar({
                 <span className="kicker rail-kicker truncate text-muted-foreground">
                   v{__APP_VERSION__}
                 </span>
+                {/* Populated by lib/tv.ts with the last key the remote sent.
+                    Blank means the WebView never delivered one. */}
+                <span
+                  id="tv-key-readout"
+                  className="kicker truncate text-acid/70"
+                  aria-hidden
+                />
               </span>
             </Link>
           ) : (
