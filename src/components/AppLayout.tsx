@@ -1,7 +1,6 @@
 import { ReactNode, useState } from "react";
 import { Menu, X } from "lucide-react";
 import Sidebar from "./Sidebar";
-import Marquee from "./Marquee";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -41,8 +40,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           collapsed ? "md:ml-[var(--rail-w-collapsed)]" : "md:ml-[var(--rail-w)]"
         }`}
       >
-        <Marquee />
-
         {/* ── Mobile header ── */}
         <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-border bg-background/90 px-4 py-3 backdrop-blur-md md:hidden">
           <button

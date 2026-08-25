@@ -17,9 +17,19 @@ const TV_UA_MARKER = "MovwayTV";
 
 export function isTvDevice(): boolean {
   if (typeof navigator === "undefined") return false;
+
   // ?tv=1 forces TV mode in a desktop browser, which is the only practical way
   // to work on this without a TV in front of you.
   if (typeof location !== "undefined" && /[?&]tv=1\b/.test(location.search)) return true;
+
+  // The packaged app IS the Google TV build, so it does not sniff for a TV —
+  // it just is one. Sniffing was a single point of failure: if the user agent
+  // came through unmarked for any reason, every TV behaviour silently stayed
+  // off and the app was unusable with a remote. Sideloading this build onto a
+  // phone gets the 10-foot layout, which is a fair trade for never shipping a
+  // dead remote again.
+  if (import.meta.env.VITE_NATIVE) return true;
+
   const ua = navigator.userAgent;
   return (
     ua.includes(TV_UA_MARKER) ||

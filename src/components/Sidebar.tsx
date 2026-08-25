@@ -116,7 +116,7 @@ export default function Sidebar({
               <span className="mt-1.5 flex items-center gap-1.5">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-acid animate-flicker" />
                 <span className="kicker rail-kicker truncate text-muted-foreground">
-                  Screening Room
+                  v{__APP_VERSION__}
                 </span>
               </span>
             </Link>
