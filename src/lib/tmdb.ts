@@ -53,11 +53,42 @@ export interface MovieDetails extends Movie {
   imdb_id: string | null;
 }
 
+export interface SeasonSummary {
+  id: number;
+  season_number: number;
+  name: string;
+  episode_count: number;
+  poster_path: string | null;
+}
+
 export interface TVDetails extends Movie {
   genres: { id: number; name: string }[];
   number_of_seasons: number;
+  seasons?: SeasonSummary[];
   external_ids?: { imdb_id: string | null };
 }
+
+export interface Episode {
+  id: number;
+  episode_number: number;
+  season_number: number;
+  name: string;
+  overview: string;
+  still_path: string | null;
+  air_date: string | null;
+  runtime: number | null;
+  vote_average: number;
+}
+
+export interface SeasonDetails {
+  id: number;
+  season_number: number;
+  name: string;
+  episodes: Episode[];
+}
+
+export const getTVSeason = (id: number, season: number) =>
+  tmdb<SeasonDetails>(`/tv/${id}/season/${season}`);
 
 export const getMovieDetails = (id: number) =>
   tmdb<MovieDetails>(`/movie/${id}`, { append_to_response: "external_ids" });

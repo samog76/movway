@@ -19,8 +19,9 @@ import {
   saveSubtitle,
 } from "@/lib/providers";
 import { upsertWatchEntry } from "@/lib/continueWatching";
+import EpisodePicker from "@/components/EpisodePicker";
 import { ArrowLeft, Star } from "lucide-react";
-import { useState, useEffect, ReactNode } from "react";
+import { useState, useEffect, useMemo, ReactNode } from "react";
 
 /** A bordered control slab — the only form idiom in this UI. */
 function Control({
@@ -108,6 +109,39 @@ export default function WatchPage() {
 
   const year = (movie?.release_date || movie?.first_air_date || "").slice(0, 4);
 
+  /**
+   * Season summaries for the picker. TMDB lists empty and placeholder seasons,
+   * which would render as dead tabs, so keep only ones with episodes. Falls
+   * back to synthesising from number_of_seasons when the field is absent.
+   */
+  const seasons = useMemo(() => {
+    if (!movie || !isTV) return [];
+    const listed = "seasons" in movie ? movie.seasons : undefined;
+    if (listed?.length) {
+      return listed
+        .filter((s) => s.episode_count > 0)
+        .sort((a, b) => {
+          // Season 0 is Specials; it belongs after the numbered run, not before it.
+          if (a.season_number === 0) return 1;
+          if (b.season_number === 0) return -1;
+          return a.season_number - b.season_number;
+        });
+    }
+    const total = ("number_of_seasons" in movie ? movie.number_of_seasons : 1) || 1;
+    return Array.from({ length: total }, (_, i) => ({
+      id: i + 1,
+      season_number: i + 1,
+      name: `Season ${i + 1}`,
+      episode_count: 0,
+      poster_path: null,
+    }));
+  }, [movie, isTV]);
+
+  const selectEpisode = (nextSeason: number, nextEpisode: number) => {
+    setSeason(nextSeason);
+    setEpisode(nextEpisode);
+  };
+
   return (
     <div className="space-y-8">
       <Link
@@ -191,44 +225,6 @@ export default function WatchPage() {
           </select>
         </Control>
 
-        {isTV && (
-          <>
-            {!isAnime && (
-              <Control label="Season">
-                <select
-                  value={season}
-                  onChange={(e) => {
-                    setSeason(Number(e.target.value));
-                    setEpisode(1);
-                  }}
-                  className={selectClass}
-                >
-                  {Array.from(
-                    {
-                      length:
-                        (movie && "number_of_seasons" in movie ? movie.number_of_seasons : 1) || 1,
-                    },
-                    (_, i) => (
-                      <option key={i + 1} value={i + 1}>
-                        S{i + 1}
-                      </option>
-                    )
-                  )}
-                </select>
-              </Control>
-            )}
-            <Control label="Ep">
-              <input
-                type="number"
-                min={1}
-                value={episode}
-                onChange={(e) => setEpisode(Number(e.target.value))}
-                className={`${selectClass} w-20`}
-              />
-            </Control>
-          </>
-        )}
-
         {!provider.supportsSubtitles && (
           <span className="font-mono text-[10px] text-muted-foreground">
             Use the player's own subtitle menu for this source.
@@ -270,6 +266,18 @@ export default function WatchPage() {
 
           <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">{movie.overview}</p>
         </div>
+      )}
+
+      {/* ── Episodes ── */}
+      {isTV && seasons.length > 0 && (
+        <EpisodePicker
+          tmdbId={tmdbId}
+          seasons={seasons}
+          season={season}
+          episode={episode}
+          showSeasons={!isAnime}
+          onSelect={selectEpisode}
+        />
       )}
 
       {/* ── Cast ── */}

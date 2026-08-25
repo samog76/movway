@@ -1,0 +1,9 @@
+# SPA fallback (Netlify).
+#
+# Movway routes client-side, so a hard load of /watch/tv/1399 asks the host for
+# a file that does not exist. Without this rule Netlify answers 404 — which is
+# exactly what a reload on a movie or series page used to produce. Serve
+# index.html for anything that is not a real file and let the router take over.
+#
+# Vite copies public/ verbatim into dist/, so this ships with every build.
+/*    /index.html   200
