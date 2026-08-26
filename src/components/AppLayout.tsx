@@ -3,7 +3,6 @@ import { Menu, X } from "lucide-react";
 import Sidebar from "./Sidebar";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
-  const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -22,8 +21,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       </div>
 
       <Sidebar
-        collapsed={collapsed}
-        setCollapsed={setCollapsed}
         mobileOpen={mobileOpen}
         onMobileClose={() => setMobileOpen(false)}
       />
@@ -36,9 +33,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       )}
 
       <main
-        className={`tv-main relative z-10 flex min-h-screen min-w-0 flex-1 flex-col overflow-x-hidden transition-all duration-300 ${
-          collapsed ? "md:ml-[var(--rail-w-collapsed)]" : "md:ml-[var(--rail-w)]"
-        }`}
+        className="tv-main relative z-10 flex min-h-screen min-w-0 flex-1 flex-col overflow-x-hidden md:pl-[var(--rail-peek)]"
       >
         {/* ── Mobile header ── */}
         <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-border bg-background/90 px-4 py-3 backdrop-blur-md md:hidden">

@@ -142,6 +142,8 @@
   :root {
     --rail-w: 236px;
     --rail-w-collapsed: 76px;
+    /* Sliver of the rail left on screen while it is parked off-canvas. */
+    --rail-peek: 6px;
   }
 
   html.tv {
@@ -155,6 +157,8 @@
        viewport or sprawl on a 4K one. */
     --rail-w: clamp(9.5rem, 19vw, 17.5rem);
     --rail-w-collapsed: clamp(3.5rem, 6vw, 6rem);
+    /* Visible from across a room, so a touch wider than the desktop sliver. */
+    --rail-peek: 0.5rem;
 
     /* Title-safe inset. Older panels crop the edges; newer ones do not, so
        keep it modest rather than wasting real estate. */
