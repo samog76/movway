@@ -19,9 +19,10 @@ import {
   saveSubtitle,
 } from "@/lib/providers";
 import { upsertWatchEntry } from "@/lib/continueWatching";
+import { isTvDevice } from "@/lib/tv";
 import EpisodePicker from "@/components/EpisodePicker";
-import { ArrowLeft, Star } from "lucide-react";
-import { useState, useEffect, useMemo, ReactNode } from "react";
+import { ArrowLeft, Play, Star } from "lucide-react";
+import { useState, useEffect, useMemo, useRef, useCallback, ReactNode } from "react";
 
 /** A bordered control slab — the only form idiom in this UI. */
 function Control({
@@ -73,6 +74,11 @@ export default function WatchPage() {
   const [subtitle, setSubtitle] = useState(() => loadSubtitle());
 
   const provider = getProvider(providerId);
+
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const shieldRef = useRef<HTMLButtonElement>(null);
+  const [isTv] = useState(() => isTvDevice());
+  const [remoteInPlayer, setRemoteInPlayer] = useState(false);
 
   useEffect(() => {
     if (!movie) return;
@@ -137,10 +143,46 @@ export default function WatchPage() {
     }));
   }, [movie, isTV]);
 
-  const selectEpisode = (nextSeason: number, nextEpisode: number) => {
+  const selectEpisode = useCallback((nextSeason: number, nextEpisode: number) => {
     setSeason(nextSeason);
     setEpisode(nextEpisode);
-  };
+  }, []);
+
+  // ── Handing the remote to the embed's own player ──────────────────────────
+
+  /**
+   * Focus moves *into* the iframe, so from that moment every key press belongs
+   * to the provider's player and this document sees none of them — that is what
+   * makes its controls usable with a D-pad, and it is also why there is no key
+   * we could listen for to get back out.
+   *
+   * Pushing a history entry first solves that: the remote's Back button pops it
+   * instead of leaving the page, and popstate is the signal to take focus back.
+   */
+  const enterPlayer = useCallback(() => {
+    const frame = iframeRef.current;
+    if (!frame) return;
+    window.history.pushState({ movwayPlayerFocus: true }, "");
+    frame.focus();
+    setRemoteInPlayer(true);
+  }, []);
+
+  useEffect(() => {
+    if (!remoteInPlayer) return;
+    const onPopState = () => {
+      setRemoteInPlayer(false);
+      window.focus();
+      // Put the remote back on the way in, so Back never dead-ends.
+      window.setTimeout(() => shieldRef.current?.focus(), 60);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [remoteInPlayer]);
+
+  // Changing stream while the remote is inside would strand it on a dead frame.
+  useEffect(() => {
+    setRemoteInPlayer(false);
+  }, [provider.id, subtitle, season, episode]);
 
   return (
     <div className="space-y-8">
@@ -160,26 +202,29 @@ export default function WatchPage() {
             <span className="h-2 w-2 rounded-full bg-acid animate-flicker" />
             <span className="h-2 w-2 rounded-full bg-violet" />
           </span>
-          <span className="kicker text-muted-foreground">Now Playing</span>
+          <span className="kicker text-muted-foreground">
+            {remoteInPlayer ? "Remote in player" : "Now Playing"}
+          </span>
           <span className="ml-auto truncate font-mono text-[10px] uppercase tracking-[0.14em] text-acid">
             {provider.name}
             {isTV && ` · S${season}E${episode}`}
           </span>
         </div>
 
-        <div className="aspect-video w-full bg-ink">
+        <div className="relative aspect-video w-full bg-ink">
           {embedUrl ? (
             <iframe
-              key={`${provider.id}-${subtitle}`}
+              ref={iframeRef}
+              key={`${provider.id}-${subtitle}-${season}-${episode}`}
               src={embedUrl}
-              className="h-full w-full"
+              className="absolute inset-0 h-full w-full border-0"
               allowFullScreen
               allow="autoplay; fullscreen; picture-in-picture; encrypted-media; clipboard-write"
               referrerPolicy="origin"
               title={title}
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center px-4 text-center">
+            <div className="absolute inset-0 flex items-center justify-center px-4 text-center">
               <div>
                 <span className="kicker text-flare">Signal Lost</span>
                 <p className="mt-2 font-mono text-[11px] text-muted-foreground">
@@ -188,7 +233,36 @@ export default function WatchPage() {
               </div>
             </div>
           )}
+
+          {/*
+            TV only. A pointer can just click the player, but a D-pad needs one
+            deliberate way in — otherwise focus wanders into the frame while
+            passing by and the remote appears to freeze, since Back is then the
+            only way out. This is that door.
+          */}
+          {isTv && !remoteInPlayer && embedUrl && (
+            <button
+              ref={shieldRef}
+              type="button"
+              onClick={enterPlayer}
+              className="group absolute inset-0 flex items-end justify-center bg-transparent pb-[8%] transition-colors focus-visible:bg-ink/40"
+              aria-label="Use the player — hands the remote to the video controls"
+            >
+              <span className="flex items-center gap-2.5 border-2 border-transparent bg-ink/80 px-4 py-2.5 text-bone opacity-0 transition-all group-hover:opacity-100 group-focus-visible:border-acid group-focus-visible:bg-acid group-focus-visible:text-ink group-focus-visible:opacity-100">
+                <Play size={15} fill="currentColor" />
+                <span className="font-mono text-[11px] font-bold uppercase tracking-[0.18em]">
+                  Press OK to use the player
+                </span>
+              </span>
+            </button>
+          )}
         </div>
+
+        {remoteInPlayer && (
+          <p className="border-t border-border bg-acid px-3 py-2 text-center font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-ink">
+            The remote is controlling {provider.name} — press Back to leave the player
+          </p>
+        )}
       </div>
 
       {/* ── Controls ── */}

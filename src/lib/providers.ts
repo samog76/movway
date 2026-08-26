@@ -21,6 +21,20 @@ export interface VideoProvider {
   ) => string;
 }
 
+/** Movway's marquee lime, so the embed's own controls match the app. */
+const VIDLINK_ACCENT = "CCFF00";
+
+const vidlinkUrl = (base: string, opts: ProviderBuildOptions): string => {
+  const url = new URL(base);
+  url.searchParams.set("autoplay", "true");
+  url.searchParams.set("primaryColor", VIDLINK_ACCENT);
+  url.searchParams.set("iconColor", VIDLINK_ACCENT);
+  if (opts.startAt && opts.startAt > 0) {
+    url.searchParams.set("startTime", String(Math.round(opts.startAt)));
+  }
+  return url.toString();
+};
+
 export const VIDEO_PROVIDERS: VideoProvider[] = [
   {
     id: "vidcore",
@@ -69,12 +83,19 @@ export const VIDEO_PROVIDERS: VideoProvider[] = [
     },
   },
   {
+    /**
+     * Its player is themed to Movway's accent, since the embed's own controls
+     * are what the remote drives once focus moves into the frame. It also takes
+     * a `startTime` offset, which is what `ProviderBuildOptions.startAt` maps
+     * onto here.
+     */
     id: "vidlink",
     name: "VidLink",
     supportsSubtitles: false,
-    buildMovieUrl: (id) => `https://vidlink.pro/movie/${id}`,
-    buildTVUrl: (id, season, episode) =>
-      `https://vidlink.pro/tv/${id}/${season}/${episode}`,
+    buildMovieUrl: (id, opts = {}) =>
+      vidlinkUrl(`https://vidlink.pro/movie/${id}`, opts),
+    buildTVUrl: (id, season, episode, opts = {}) =>
+      vidlinkUrl(`https://vidlink.pro/tv/${id}/${season}/${episode}`, opts),
   },
   {
     id: "embedsu",

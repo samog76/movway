@@ -235,7 +235,12 @@ function onKeyDown(event: KeyboardEvent) {
   // D-pad centre does not always arrive as Enter, which leaves the remote able
   // to move but not to choose anything.
   if (SELECT_CODES.has(event.keyCode || event.which) && event.key !== "Enter") {
-    if (active && active !== document.body && active.matches(FOCUSABLE_SELECTOR)) {
+    if (
+      active &&
+      active !== document.body &&
+      active.tagName !== "SELECT" &&
+      active.matches(FOCUSABLE_SELECTOR)
+    ) {
       recordKey(event, true);
       event.preventDefault();
       active.click();
@@ -251,9 +256,14 @@ function onKeyDown(event: KeyboardEvent) {
 
   const tag = active?.tagName;
 
-  // Native controls own the arrows they actually use: a select opens its list,
-  // and a caret moves along text. Vertical keys still walk out of a text field.
-  if (tag === "SELECT") return;
+  // A select claims no arrows at all. Giving it any left the remote stuck on
+  // the Source dropdown — the native element eats the key to change option and
+  // never yields focus, so no press could leave it, and the player sitting just
+  // above became unreachable. Selection happens through the WebView's own
+  // option picker on OK (handled above), which the remote drives natively,
+  // so the walker is free to own every direction here.
+  //
+  // A caret still owns horizontal keys in a text field; vertical walks out.
   if (tag === "TEXTAREA") return;
   if (tag === "INPUT") {
     const type = (active as HTMLInputElement).type;

@@ -26,6 +26,36 @@ copy `.env.example` to `.env` and set `VITE_TMDB_API_KEY`.
 
 ---
 
+## Player controls on a remote
+
+Playback controls belong to the provider's player inside the `<iframe>`. Movway
+does not draw its own: every provider is a cross-origin embed, so nothing here
+can call play/pause/seek on their video or hide their UI, and a parallel set of
+controls that mostly could not act was worse than none.
+
+What the app does instead is get the D-pad *into* that player.
+
+- **A door, not a trap.** On TV the frame is covered by a focusable shield
+  ("Press OK to use the player"). The walker in `src/lib/tv.ts` treats it as one
+  ordinary focus target, so arriving at the player is deliberate. Without it,
+  focus wanders into the frame in passing and the remote looks frozen.
+- **OK hands the remote over.** `iframe.focus()` moves focus into the embed, and
+  from then on every key press is the provider's — which is exactly what makes
+  its own controls work with a D-pad.
+- **Back brings it home.** Because this document stops receiving keys entirely,
+  there is no keypress we could listen for to get back out. Entering pushes a
+  history entry first, so the remote's Back button pops that instead of leaving
+  the page, and `popstate` is the cue to take focus back and restore the shield.
+- **Changing stream drops the handover**, so switching source or episode never
+  strands the remote inside a frame that is being torn down.
+
+Two D-pad rules in `tv.ts` are worth knowing about. A `<select>` claims no arrow
+keys: giving it any welded the remote to the Source dropdown, because the native
+element eats the key to change option and never yields focus, which also made
+the player just above it unreachable. Selection happens through the WebView's
+own option picker on OK, which the remote drives natively. Text inputs still
+keep left/right for the caret.
+
 ## Google TV build
 
 ### How TV mode works
