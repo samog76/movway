@@ -11,6 +11,8 @@ Ships in two forms:
 
 ---
 
+> **Working on this from the machine at home?** Read [LOCAL-SESSION.md](LOCAL-SESSION.md).
+>
 > **Picking this up fresh?** Read [HANDOVER.md](HANDOVER.md) first. It covers what the app
 > is, what was measured to be impossible inside the embedded players (and why), the one task
 > outstanding, and the traps that cost real time.

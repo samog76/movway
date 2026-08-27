@@ -3,7 +3,7 @@
 Everything a fresh session needs to pick this up: what the app is, what was built,
 what was proven impossible and why, and where the work stands.
 
-**State:** v1.5.1 · versionCode 14 · 58 tests passing · `main` @ c217628
+**State:** v1.5.1 · versionCode 14 · 63 tests passing · `main` @ c217628
 
 ---
 
@@ -33,7 +33,7 @@ shouldn't be re-litigated without reason.
 | Back button | **works** | Steps back through the app; exits only from the first screen. |
 | Native player | **the only player** | Movway's own `<video>` + hls.js with working controls. Every title plays through it. |
 | Embedded players | **removed** | VidLink and VidCore are gone — they could only ever show a picture, and falling back to one hid a broken backend. See §3. |
-| Streaming backend | **deployed** | CinePro Core on Render at `https://cinepro-core-5kv0.onrender.com`. Enter it in Settings on each device. |
+| Streaming backend | **must run at home** | CinePro Core behind a Cloudflare Tunnel. A cloud host returns nothing — the providers block datacenter IPs. See §4. |
 
 ---
 
@@ -88,61 +88,85 @@ console on a television.
 
 ## 4. The streaming backend
 
-A **CinePro Core** instance ([docs.cinepro.cc](https://docs.cinepro.cc)) is deployed and live:
+Movway needs an OMSS backend ([docs.cinepro.cc](https://docs.cinepro.cc)) to play anything.
+A **CinePro Core** instance is the one this project uses.
 
-| | |
-|---|---|
-| Address | `https://cinepro-core-5kv0.onrender.com` |
-| Render service | `cinepro-core` · `srv-da87phifngtc73bldgl0` · Frankfurt · **free** plan |
-| Source | `github.com/samog76/core` @ `98ba005`, auto-deploy **off** |
-| Workspace | `rebel.game09@gmail.com` — the owner's own account, confirmed before creating |
+> **A cloud host does not work for this, and that is measured, not assumed.**
+> CinePro's provider scrapers are blocked from datacenter IP ranges. The same commit, the
+> same TMDB key and the same title were run from both, minutes apart:
+>
+> | Provider | Render (Frankfurt) | A home connection |
+> |---|---|---|
+> | VixSrc | 0 sources | **1 source** (hls 1080p, eng+ita audio) |
+> | FshareTV | 0 sources | **3 sources** (mp4 720p ×2, 360p) |
+> | The other 12 | 0 | 0 |
+>
+> VidSrc says so in its own diagnostic: *"Invalid or expired token. Note that VidSrc blocks
+> all kinds of VPN IPs."* Everything from a datacenter returns `404 No streaming sources
+> found`, which looks exactly like a broken deployment and is not one.
 
-Point a device at it with Settings → Streaming backend → the https URL → **Test
-connection**, which should report `CinePro` and its version. The watch page then uses the
-native player automatically. The address lives in that device's `localStorage`, so it has
-to be entered on each device — there is no default in the code, by design.
+### The arrangement that works
 
-### How it is configured, and why
+Run CinePro on a machine at home and expose it over https with a Cloudflare Tunnel — a
+residential IP, a real hostname, and no cold starts.
 
-```
-# Build and start
+```bash
+# On the home machine, in a checkout of github.com/samog76/core
 npm install --include=dev && npm run build
-node dist/server.js
+HOST=0.0.0.0 PORT=8099 CACHE_TYPE=memory \
+  TMDB_API_KEY=<the key that is also the fallback in src/lib/tmdb.ts> \
+  node dist/server.js
 
-# Environment
-NODE_ENV=production
-HOST=0.0.0.0
-CORS_ORIGIN=*
-CACHE_TYPE=memory
-NPM_CONFIG_INCLUDE=dev
-PUBLIC_URL=https://cinepro-core-5kv0.onrender.com
-TMDB_API_KEY=<the key that is also the fallback in src/lib/tmdb.ts>
+# In a second shell — prints the https URL to put in Settings
+cloudflared tunnel --url http://localhost:8099
 ```
 
-Three of those are load-bearing and were each confirmed against a real deploy:
+Then Settings → Streaming backend → that https URL → **Test connection**, which should
+report `CinePro` and its version. The address lives in that device's `localStorage`, so it
+is entered per device; there is no default in the code, by design.
+
+A `trycloudflare.com` quick tunnel gets a new random hostname every run, which is fine for
+testing and useless for a television. A stable hostname needs a Cloudflare account, a
+domain and a named tunnel.
+
+### Expect thin coverage
+
+Only **2 of 14 providers return anything at all**, even from a residential IP. The rest
+fail with 404s, dead fetches, or in VidNest's case a crash
+(`Cannot read properties of undefined (reading 'map')`). Upstream `cinepro-org/core` has
+not shipped since May 2026 and the fork is identical to its HEAD, so there is nothing to
+pull. Some titles will genuinely have no source, and that is not a fault in Movway.
+
+### Configuration traps, confirmed against real deployments
 
 - **`NPM_CONFIG_INCLUDE=dev` / `--include=dev`.** CinePro's own `render.yaml` sets
   `NODE_ENV=production`, which makes npm set `omit=dev`. `@types/node` never installs and
-  `tsc` dies with ~30 errors like `Cannot find name 'process'`. Reproduced exactly, and
-  fixed by including dev dependencies.
+  `tsc` dies with ~30 errors like `Cannot find name 'process'`.
 
-- **`HOST=0.0.0.0`.** `src/server.ts` defaults to `localhost`, which Render cannot route
-  to, so the service would build and then fail its health check.
+- **`HOST=0.0.0.0`.** `src/server.ts` defaults to `localhost`, which a host cannot route
+  to, so the service builds and then fails its health check.
 
-- **`PUBLIC_URL`.** Without it the server logs `Proxy base URL: http://localhost:10000`
-  and hands back source and subtitle URLs on that address — unreachable, and `http`, which
-  the TV blocks anyway. With it set the log reads
-  `Proxy base URL: https://cinepro-core-5kv0.onrender.com`. This one is easy to miss
-  because the service looks healthy either way.
+- **`PUBLIC_URL` — no longer required, and worth knowing why.** Unset, CinePro logs
+  `Proxy base URL: http://localhost:<port>` and stamps that address into every source and
+  subtitle URL. Unreachable from any other machine, `http` where the TV demands https, and
+  invisible from outside: the health check passes and a full set of sources comes back,
+  every one of them dead. Movway now repairs this itself — `resolveUrl` re-points a
+  loopback URL at the address configured in Settings, which is demonstrably the one
+  reaching the backend. Setting `PUBLIC_URL` correctly is still tidier; it is no longer
+  load-bearing.
 
-The start command is `node dist/server.js`, **not** the project's own `npm run start`. That
-script is `npm run build && node dist/server.js`, so it reruns `tsc` on every cold start —
-wasteful anywhere, and the free plan already sleeps after ~15 minutes idle, so the first
-title after a break waits on a cold start. Starter (~$7/mo) stays warm; a Cloudflare Tunnel
-to a machine at home is the other good option. Supabase is **not** viable — it hosts
-Postgres, Auth, Storage and Deno edge functions, not a long-running Node server.
+- **Start with `node dist/server.js`, not `npm run start`.** That script is
+  `npm run build && node dist/server.js`, so it reruns `tsc` on every boot.
 
-Auto-deploy is off, so upstream changes to the fork will not ship by themselves.
+### The Render service, kept as a record
+
+`cinepro-core` · `srv-da87phifngtc73bldgl0` · Frankfurt · free plan ·
+`https://cinepro-core-5kv0.onrender.com`, built from `github.com/samog76/core` @ `98ba005`
+with auto-deploy off, in the `rebel.game09@gmail.com` workspace. It builds, boots and
+answers `/v1/health` correctly — and returns `404` for every title, for the reason above.
+It is dead weight; deleting it needs the dashboard, as the Render MCP has no delete tool.
+Supabase was never viable: it hosts Postgres, Auth, Storage and Deno edge functions, not a
+long-running Node server.
 
 > **Confirm which account a connector is signed in to before creating or spending
 > anything.** An earlier session had Render and Supabase authenticated as a *different
@@ -157,7 +181,7 @@ Auto-deploy is off, so upstream changes to the fork will not ship by themselves.
 | Path | What it does |
 |---|---|
 | `src/lib/tv.ts` | The D-pad. Geometric focus walker with zones, key-code translation for real remote hardware, focus seeding. The most subtle file in the project. |
-| `src/lib/omss.ts` | Client for the streaming backend. Fetches sources, resolves proxy paths, ranks sources, flags addresses the packaged app can't reach. |
+| `src/lib/omss.ts` | Client for the streaming backend. Fetches sources, ranks them, flags addresses the packaged app can't reach, and repairs proxy URLs a backend reports on loopback. |
 | `src/components/NativePlayer.tsx` | Movway's own player: `<video>` + hls.js, controls that genuinely work, falls through to the next source on failure. |
 | `src/lib/backHandler.ts` | Interceptor chain for the hardware Back button. Innermost surface claims the press first. |
 | `src/components/NativeBackButton.tsx` | Wires Android's Back to the router. Walks its own route stack rather than `history.go()`. |
@@ -225,7 +249,7 @@ in `download-site/index.html`.
 ```bash
 # checks — all must pass before shipping
 npx tsc --noEmit
-npm run test          # 58 tests
+npm run test          # 63 tests
 npm run lint
 npm run build
 
