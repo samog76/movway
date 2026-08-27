@@ -10,6 +10,7 @@ import {
   Radio,
   Heart,
   Clock,
+  Settings,
   Pin,
   PinOff,
 } from "lucide-react";
@@ -31,6 +32,7 @@ const mediaItems = [
   { icon: Radio, label: "Live", path: "/browse/sports" },
   { icon: Heart, label: "Watchlist", path: "/watchlist" },
   { icon: Clock, label: "History", path: "/history" },
+  { icon: Settings, label: "Settings", path: "/settings" },
 ];
 
 const PIN_KEY = "movway:rail-pinned";

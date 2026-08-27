@@ -26,35 +26,49 @@ copy `.env.example` to `.env` and set `VITE_TMDB_API_KEY`.
 
 ---
 
-## Player controls on a remote
+## Playback
 
-Playback controls belong to the provider's player inside the `<iframe>`. Movway
-does not draw its own: every provider is a cross-origin embed, so nothing here
-can call play/pause/seek on their video or hide their UI, and a parallel set of
-controls that mostly could not act was worse than none.
+Movway can play a title two ways, and which one it uses decides whether its own
+controls do anything.
 
-What the app does instead is get the D-pad *into* that player.
+### Its own player (a streaming backend)
 
-- **A door, not a trap.** On TV the frame is covered by a focusable shield
-  ("Press OK to use the player"). The walker in `src/lib/tv.ts` treats it as one
-  ordinary focus target, so arriving at the player is deliberate. Without it,
-  focus wanders into the frame in passing and the remote looks frozen.
-- **OK hands the remote over.** `iframe.focus()` moves focus into the embed, and
-  from then on every key press is the provider's — which is exactly what makes
-  its own controls work with a D-pad.
-- **Back brings it home.** Because this document stops receiving keys entirely,
-  there is no keypress we could listen for to get back out. Entering pushes a
-  history entry first, so the remote's Back button pops that instead of leaving
-  the page, and `popstate` is the cue to take focus back and restore the shield.
-- **Changing stream drops the handover**, so switching source or episode never
-  strands the remote inside a frame that is being torn down.
+Point Movway at an [OMSS](https://docs.cinepro.cc) backend — a self-hosted
+CinePro Core instance, for example — under **Settings → Streaming backend**. It
+then asks that backend for the stream and plays it in its own `<video>` with
+hls.js, so play, pause, seek, subtitles and volume are ordinary operations on an
+element the app owns. This is the only arrangement where a remote can drive
+playback.
 
-Two D-pad rules in `tv.ts` are worth knowing about. A `<select>` claims no arrow
-keys: giving it any welded the remote to the Source dropdown, because the native
-element eats the key to change option and never yields focus, which also made
-the player just above it unreachable. Selection happens through the WebView's
-own option picker on OK, which the remote drives natively. Text inputs still
-keep left/right for the caret.
+The backend runs on your own machine or home server, needs a TMDB key, and must
+be reachable from the TV. Every URL it returns is a path onto its own proxy, so
+upstream headers and CORS are its problem rather than the app's. CinePro Core is
+licensed for personal use.
+
+`src/lib/omss.ts` is the client; `src/components/NativePlayer.tsx` is the player.
+Sources are ranked so a playable type and the highest resolution come first, and
+a source that fails hands over to the next one before giving up.
+
+### Embedded players (the fallback)
+
+With no backend configured — or if nothing it offers will play — Movway falls
+back to embedding VidLink (default) or VidCore in an `<iframe>`, which is how it
+worked before. Those are worth understanding, because their limits are what
+motivated the player above:
+
+- **Commands are ignored.** Sending the five common postMessage dialects to
+  VidLink was measured to change nothing; playback carried on.
+- **Their player has no keyboard handling.** Dispatching Space and ArrowRight at
+  its document, body and video element moved neither playback nor position, so a
+  D-pad cannot drive it even with focus delivered perfectly.
+- **Their UI cannot be removed or mirrored.** A cross-origin frame cannot be
+  drawn to a canvas or captured, and CSS cropping cannot remove controls that sit
+  over the video.
+
+So the embed path gives a picture and nothing else: the on-screen chrome there
+can switch source, change episode and go fullscreen, but not pause. If VidLink
+stays silent past `FALLBACK_AFTER_MS` it switches to VidCore on its own — see
+`src/lib/sourceFallback.ts`.
 
 ## Google TV build
 

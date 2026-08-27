@@ -10,6 +10,7 @@ import NativeBackButton from "@/components/NativeBackButton";
 import SearchPage from "./pages/SearchPage";
 import WatchPage from "./pages/WatchPage";
 import BrowsePage from "./pages/BrowsePage";
+import SettingsPage from "./pages/SettingsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -38,6 +39,7 @@ const App = () => (
           <Route path="/search" element={<AppLayout><SearchPage /></AppLayout>} />
           <Route path="/watch/:type/:id" element={<AppLayout><WatchPage /></AppLayout>} />
           <Route path="/browse/:category" element={<AppLayout><BrowsePage /></AppLayout>} />
+          <Route path="/settings" element={<AppLayout><SettingsPage /></AppLayout>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Router>

@@ -22,6 +22,8 @@ import {
 } from "@/lib/providers";
 import { upsertWatchEntry } from "@/lib/continueWatching";
 import { isTvDevice } from "@/lib/tv";
+import NativePlayer from "@/components/NativePlayer";
+import { fetchEpisodeSources, fetchMovieSources, loadBackendUrl } from "@/lib/omss";
 import { FALLBACK_AFTER_MS, shouldWatchForFailure } from "@/lib/sourceFallback";
 import { registerBackInterceptor } from "@/lib/backHandler";
 import { Capacitor } from "@capacitor/core";
@@ -85,6 +87,26 @@ export default function WatchPage() {
   const [isTv] = useState(() => isTvDevice());
   const [remoteInPlayer, setRemoteInPlayer] = useState(false);
   const [sourcePickedByHand, setSourcePickedByHand] = useState(false);
+
+  /**
+   * A configured OMSS backend replaces the embed with a stream Movway plays
+   * itself, which is the only arrangement where its own controls actually do
+   * anything. With none set, or if nothing it returns will play, the embed
+   * stays exactly as it was.
+   */
+  const [backendUrl] = useState(() => loadBackendUrl());
+  const [nativeUnplayable, setNativeUnplayable] = useState<string | null>(null);
+
+  const { data: streams, isError: streamsError } = useQuery({
+    queryKey: ["omss", backendUrl, type, tmdbId, season, episode],
+    queryFn: ({ signal }) =>
+      isTV
+        ? fetchEpisodeSources(backendUrl, tmdbId, season, episode, signal)
+        : fetchMovieSources(backendUrl, tmdbId, signal),
+    enabled: backendUrl.length > 0,
+    retry: 1,
+    staleTime: 60 * 1000,
+  });
   const [fellBack, setFellBack] = useState(false);
 
   useEffect(() => {
@@ -125,6 +147,10 @@ export default function WatchPage() {
   };
 
   const year = (movie?.release_date || movie?.first_air_date || "").slice(0, 4);
+
+  const playableStreams = streams?.sources ?? [];
+  const useNativePlayer =
+    backendUrl.length > 0 && !nativeUnplayable && !streamsError && playableStreams.length > 0;
 
   /**
    * Season summaries for the picker. TMDB lists empty and placeholder seasons,
@@ -220,6 +246,11 @@ export default function WatchPage() {
     setRemoteInPlayer(false);
   }, [provider.id, subtitle, season, episode]);
 
+  // A new title deserves a fresh attempt at the good path.
+  useEffect(() => {
+    setNativeUnplayable(null);
+  }, [tmdbId, season, episode]);
+
   /**
    * Fall back to the alternate source when the default never comes up.
    *
@@ -279,14 +310,30 @@ export default function WatchPage() {
             <span className="h-2 w-2 rounded-full bg-violet" />
           </span>
           <span className="kicker text-muted-foreground">
-            {remoteInPlayer ? "Remote in player" : fellBack ? "Switched source" : "Now Playing"}
+            {useNativePlayer
+              ? "Now Playing"
+              : remoteInPlayer
+                ? "Remote in player"
+                : fellBack
+                  ? "Switched source"
+                  : "Now Playing"}
           </span>
           <span className="ml-auto truncate font-mono text-[10px] uppercase tracking-[0.14em] text-acid">
-            {provider.name}
+            {useNativePlayer ? streams?.sources[0]?.provider?.name ?? "Direct" : provider.name}
             {isTV && ` · S${season}E${episode}`}
           </span>
         </div>
 
+        {useNativePlayer ? (
+          <NativePlayer
+            sources={playableStreams}
+            subtitles={streams?.subtitles ?? []}
+            title={title}
+            onPrevEpisode={isTV && episode > 1 ? () => selectEpisode(season, episode - 1) : undefined}
+            onNextEpisode={isTV ? () => selectEpisode(season, episode + 1) : undefined}
+            onUnplayable={setNativeUnplayable}
+          />
+        ) : (
         <div className="relative aspect-video w-full bg-ink">
           {embedUrl ? (
             <iframe
@@ -334,8 +381,9 @@ export default function WatchPage() {
             </button>
           )}
         </div>
+        )}
 
-        {remoteInPlayer && (
+        {remoteInPlayer && !useNativePlayer && (
           <p className="border-t border-border bg-acid px-3 py-2 text-center font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-ink">
             The remote is controlling {provider.name} — press Back to leave the player
           </p>
