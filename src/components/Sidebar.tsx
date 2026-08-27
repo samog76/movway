@@ -14,6 +14,8 @@ import {
   PinOff,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { registerBackInterceptor } from "@/lib/backHandler";
+import { focusFirstInMain } from "@/lib/tv";
 
 const navItems = [
   { icon: Home, label: "Home", path: "/" },
@@ -95,14 +97,42 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
    * in lib/tv.ts moves focus programmatically, and a listener here catches
    * every route in and out of the rail with one subscription.
    */
+  /** Where the remote was in the page before it stepped into the rail. */
+  const lastPageFocus = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
     const sync = () => {
       const el = asideRef.current;
-      setFocusWithin(!!el && el.contains(document.activeElement));
+      const active = document.activeElement as HTMLElement | null;
+      const inside = !!el && !!active && el.contains(active);
+      if (!inside && active && active !== document.body) lastPageFocus.current = active;
+      setFocusWithin(inside);
     };
     document.addEventListener("focusin", sync);
     return () => document.removeEventListener("focusin", sync);
   }, []);
+
+  /**
+   * Back closes the menu before it means anything else, the way a TV app's menu
+   * behaves — you step in with left, and step out with back or right, without
+   * leaving the screen you were on. A pinned rail is part of the furniture
+   * rather than something you opened, so it does not claim the press.
+   */
+  useEffect(() => {
+    if (!focusWithin || pinned) return;
+    return registerBackInterceptor(() => {
+      const back = lastPageFocus.current;
+      if (back && document.contains(back)) {
+        back.focus();
+      } else {
+        // Must land on something focusable, or the rail hides with the remote
+        // still nominally inside it and nothing highlighted anywhere.
+        focusFirstInMain();
+      }
+      setFocusWithin(false);
+      return true;
+    });
+  }, [focusWithin, pinned]);
 
   useEffect(() => {
     setPinned(localStorage.getItem(PIN_KEY) === "1");
@@ -135,6 +165,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         ref={asideRef}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
+        data-focus-zone="rail"
         className={`tv-rail fixed left-0 top-0 z-40 flex h-screen w-[var(--rail-w)] flex-col border-r border-border bg-[hsl(var(--sidebar-background))] transition-transform duration-300 ease-out ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         } ${

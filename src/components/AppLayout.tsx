@@ -1,9 +1,17 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { seedFocusSoon } from "@/lib/tv";
 import { Menu, X } from "lucide-react";
 import Sidebar from "./Sidebar";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { pathname } = useLocation();
+
+  // Never leave a TV screen with nothing focused.
+  useEffect(() => {
+    seedFocusSoon();
+  }, [pathname]);
 
   return (
     <div className="grain-overlay relative flex min-h-screen bg-background">
@@ -33,6 +41,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       )}
 
       <main
+        data-focus-zone="main"
         className="tv-main relative z-10 flex min-h-screen min-w-0 flex-1 flex-col overflow-x-hidden md:pl-[var(--rail-peek)]"
       >
         {/* ── Mobile header ── */}

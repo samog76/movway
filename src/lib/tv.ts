@@ -53,6 +53,7 @@ type Direction = "up" | "down" | "left" | "right";
 interface Candidate {
   el: HTMLElement;
   rect: DOMRect;
+  zone: string;
 }
 
 /**
@@ -73,10 +74,49 @@ function isReachable(el: HTMLElement): boolean {
   return true;
 }
 
+/**
+ * Focus zones.
+ *
+ * A TV app is not one flat plane of controls: the left rail and the content
+ * are separate columns, and every set-top interface worth copying treats them
+ * that way. Pressing down in a page moves down *that page* — it never slides
+ * sideways into the menu — and the menu is something you step into on purpose
+ * by pressing left, then step out of by pressing right.
+ *
+ * Without that split the geometry alone decides, and the geometry is wrong
+ * here: the rail is parked off-canvas near x=-233, so on a 1280px screen a rail
+ * link sits far closer to the *centre* of a left-aligned control than the page
+ * content does. Moving down from "Back to Lobby" cost 764 to reach the rail and
+ * 1605 to reach the player below it, so focus left the page and walked the menu
+ * instead — which is exactly the bug this fixes.
+ */
+function zoneOf(el: HTMLElement): string {
+  return el.closest("[data-focus-zone]")?.getAttribute("data-focus-zone") ?? "main";
+}
+
+/**
+ * Rect of each zone's container. Crossing between zones has to be decided from
+ * these rather than from the two elements, because the rail is `fixed` and
+ * slides *over* the content rather than pushing it aside: once it is revealed a
+ * rail link's right edge sits well to the right of where the page's controls
+ * start, so element-level geometry claims the content is "behind" you and every
+ * crossing is refused. The containers still say plainly which side is which.
+ */
+function zoneRects(): Map<string, DOMRect> {
+  const map = new Map<string, DOMRect>();
+  for (const el of document.querySelectorAll<HTMLElement>("[data-focus-zone]")) {
+    const name = el.getAttribute("data-focus-zone");
+    if (name && !map.has(name)) map.set(name, el.getBoundingClientRect());
+  }
+  return map;
+}
+
 function candidates(): Candidate[] {
   const found: Candidate[] = [];
   for (const el of document.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)) {
-    if (isReachable(el)) found.push({ el, rect: el.getBoundingClientRect() });
+    if (isReachable(el)) {
+      found.push({ el, rect: el.getBoundingClientRect(), zone: zoneOf(el) });
+    }
   }
   return found;
 }
@@ -149,20 +189,21 @@ function move(dir: Direction): boolean {
 
   const active = document.activeElement as HTMLElement | null;
   if (!active || active === document.body || !isReachable(active)) {
-    reveal(all[0].el);
+    // Seed into the content, never the menu: landing in a rail that is parked
+    // off-screen looks like the remote has died.
+    reveal((all.find((c) => c.zone === "main") ?? all[0]).el);
     return true;
   }
 
   const from = active.getBoundingClientRect();
+  const fromZone = zoneOf(active);
 
-  // Two passes: keep to the current row if anything is there, otherwise take
-  // the nearest thing in that direction — which is what carries you out of the
-  // sidebar and into the posters.
-  const pick = (sameRowOnly: boolean): HTMLElement | null => {
+  const pick = (sameRowOnly: boolean, sameZoneOnly: boolean): HTMLElement | null => {
     let best: HTMLElement | null = null;
     let bestCost = Infinity;
-    for (const { el, rect } of all) {
+    for (const { el, rect, zone } of all) {
       if (el === active) continue;
+      if (sameZoneOnly && zone !== fromZone) continue;
       const c = cost(from, rect, dir, sameRowOnly);
       if (c === null || c >= bestCost) continue;
       bestCost = c;
@@ -171,7 +212,47 @@ function move(dir: Direction): boolean {
     return best;
   };
 
-  const target = pick(true) ?? pick(false);
+  // Up and down stay inside the zone, full stop. Running out of page is a real
+  // answer — it means you are at the end of it — and is far better than being
+  // thrown into the menu mid-scroll.
+  if (dir === "up" || dir === "down") {
+    const target = pick(false, true);
+    if (!target) return false;
+    reveal(target);
+    return true;
+  }
+
+  /**
+   * Stepping between zones. Which zone lies which way is settled by the
+   * containers; the element chosen inside it is simply the one nearest on the
+   * vertical, so you come out of the menu beside whatever you were pointing at.
+   */
+  const crossZone = (): HTMLElement | null => {
+    const rects = zoneRects();
+    const here = rects.get(fromZone);
+    if (!here) return null;
+    const hereCentre = (here.left + here.right) / 2;
+
+    let best: HTMLElement | null = null;
+    let bestCost = Infinity;
+    for (const { el, rect, zone } of all) {
+      if (zone === fromZone) continue;
+      const there = rects.get(zone);
+      if (!there) continue;
+      const thereCentre = (there.left + there.right) / 2;
+      if (dir === "left" ? thereCentre >= hereCentre : thereCentre <= hereCentre) continue;
+
+      const c = Math.abs((rect.top + rect.bottom) / 2 - (from.top + from.bottom) / 2);
+      if (c >= bestCost) continue;
+      bestCost = c;
+      best = el;
+    }
+    return best;
+  };
+
+  // Left and right prefer the current zone, then cross. That crossing is the
+  // only way in and out of the rail, which is what makes it feel deliberate.
+  const target = pick(true, true) ?? pick(false, true) ?? crossZone();
   if (!target) return false;
   reveal(target);
   return true;
@@ -274,7 +355,13 @@ function onKeyDown(event: KeyboardEvent) {
 
   const moved = move(dir);
   recordKey(event, moved);
-  if (moved) event.preventDefault();
+
+  // Always consume the key, even when nothing moved. Letting a refused press
+  // through hands it to Chromium's DOM-order focus navigation — the very
+  // behaviour this walker exists to replace — and that ignores zones entirely,
+  // so reaching the end of a page would fling focus into the menu. Refusing to
+  // move *is* the answer at an edge; it should feel like a wall, not a trapdoor.
+  event.preventDefault();
 }
 
 // ── Focus seeding ────────────────────────────────────────────────────────────
@@ -283,12 +370,33 @@ function onKeyDown(event: KeyboardEvent) {
 function seedFocus() {
   const active = document.activeElement;
   if (active && active !== document.body && isReachable(active as HTMLElement)) return;
-  const first = document.querySelector<HTMLElement>(
-    `main ${FOCUSABLE_SELECTOR.split(",").join(", main ")}`
-  );
-  (first ?? document.querySelector<HTMLElement>(FOCUSABLE_SELECTOR))?.focus({
-    preventScroll: true,
-  });
+
+  // Reachability matters as much here as it does when moving. Picking by
+  // selector alone lands on the first focusable in <main>, which is the mobile
+  // menu button — inside a `md:hidden` wrapper, so `display: none` at every TV
+  // width. Focusing it does nothing at all, activeElement stays on the body,
+  // and the screen comes up with no highlight anywhere: the dead-remote
+  // symptom this is supposed to prevent.
+  focusFirstInMain();
+}
+
+/**
+ * Move the remote to the first control in the content area that can actually
+ * take focus, and report whether anything did.
+ *
+ * Selecting by CSS alone is not enough: the first focusable inside <main> is
+ * the mobile menu button, which lives in a `md:hidden` wrapper and is therefore
+ * `display: none` at every TV width. Focusing it does nothing, activeElement
+ * stays on the body, and the screen comes up with no highlight anywhere.
+ */
+export function focusFirstInMain(): boolean {
+  const usable = candidates();
+  const target =
+    usable.find((c) => c.zone === "main") ??
+    usable.find((c) => c.zone !== "rail") ??
+    usable[0];
+  target?.el.focus({ preventScroll: true });
+  return !!target;
 }
 
 /**
@@ -301,6 +409,19 @@ function onFocusIn(event: FocusEvent) {
   // reveal() already positioned this one; scrolling again would fight it.
   if (performance.now() - lastMoveAt < 80) return;
   el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+}
+
+/**
+ * Re-seed after a route change. A client-side navigation tears out the element
+ * the remote was on, leaving document.body focused and nothing highlighted on
+ * screen — which reads as a dead remote until the next press happens to revive
+ * it. Every TV interface keeps something focused at all times; this is that.
+ *
+ * The delay lets the incoming route paint before we look for a target.
+ */
+export function seedFocusSoon(delay = 250): void {
+  if (typeof window === "undefined" || !isTvDevice()) return;
+  window.setTimeout(seedFocus, delay);
 }
 
 let started = false;
