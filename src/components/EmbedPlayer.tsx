@@ -149,6 +149,33 @@ export default function EmbedPlayer({
     };
   }, []);
 
+  /**
+   * Scrubbing commits once the viewer settles, not on every value change.
+   *
+   * A range input fires onChange continuously — on each step of a drag, and on
+   * every D-pad press — and each seek here reloads the provider's page. Wired
+   * straight through, dragging across a two-hour film issued hundreds of page
+   * loads in seconds, which reads to any bot protection exactly like an attack
+   * and got the viewer's own address blocked. The value on screen follows the
+   * handle immediately; only the reload waits.
+   */
+  const [scrubTo, setScrubTo] = useState<number | null>(null);
+  const commitTimer = useRef<number | undefined>(undefined);
+
+  const onScrubChange = useCallback(
+    (value: number) => {
+      setScrubTo(value);
+      window.clearTimeout(commitTimer.current);
+      commitTimer.current = window.setTimeout(() => {
+        setScrubTo(null);
+        onSeekTo(value);
+      }, 900);
+    },
+    [onSeekTo]
+  );
+
+  useEffect(() => () => window.clearTimeout(commitTimer.current), []);
+
   const toggleFullscreen = useCallback(() => {
     if (document.fullscreenElement) void document.exitFullscreen();
     else void boxRef.current?.requestFullscreen?.();
@@ -222,8 +249,8 @@ export default function EmbedPlayer({
       >
         <div className="flex items-center gap-3 px-3">
           <span className="font-mono text-[11px] tabular-nums text-acid">
-            {!playback.reported && "~"}
-            {formatTime(playback.position)}
+            {scrubTo === null && !playback.reported && "~"}
+            {formatTime(scrubTo ?? playback.position)}
           </span>
           {/* A range input on purpose: lib/tv.ts hands arrow keys straight to
               one, so the D-pad scrubs without any extra key handling. */}
@@ -233,8 +260,8 @@ export default function EmbedPlayer({
             min={0}
             max={scrubMax || 100}
             step={10}
-            value={Math.min(playback.position, scrubMax || 100)}
-            onChange={(e) => onSeekTo(Number(e.target.value))}
+            value={Math.min(scrubTo ?? playback.position, scrubMax || 100)}
+            onChange={(e) => onScrubChange(Number(e.target.value))}
             disabled={!scrubMax}
             aria-label="Seek"
           />

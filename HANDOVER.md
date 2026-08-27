@@ -3,7 +3,7 @@
 Everything a fresh session needs to pick this up: what the app is, what was built,
 what was proven impossible and why, and the one task waiting at the front of the queue.
 
-**State:** v1.6.1 · versionCode 16 · 77 tests passing
+**State:** v1.6.2 · versionCode 17 · 77 tests passing
 
 ---
 
@@ -210,6 +210,12 @@ and Deno edge functions, not a long-running Node server.
 - **Node 22 shadows jsdom's localStorage.** Node defines a global `localStorage` that needs
   a launch flag, so storage throws under test while working in a browser.
   `src/test/setup.ts` installs an in-memory one.
+
+- **Every seek reloads the provider's page, so seeks must be rationed.** A range input's
+  `onChange` fires on each step of a drag and on every D-pad press; wired straight to a seek
+  it issued hundreds of page loads in seconds and got the viewer's own IP blocked by
+  Cloudflare. `EmbedPlayer` commits a scrub only after the handle settles. Any new control
+  that reloads the frame needs the same treatment.
 
 - **`npx tsc --noEmit` checks nothing.** `tsconfig.json` has `"files": []` and only project
   references, so that command silently passes with real type errors present. It hid three.
