@@ -13,6 +13,7 @@ import {
   VIDEO_PROVIDERS,
   SUBTITLE_LANGUAGES,
   getProvider,
+  nextProviderId,
   loadProviderId,
   saveProviderId,
   loadSubtitle,
@@ -88,6 +89,8 @@ export default function WatchPage() {
   const [paused, setPaused] = useState(false);
   const [startAt, setStartAt] = useState(0);
   const [reloadNonce, setReloadNonce] = useState(0);
+  /** Set once the viewer chooses a source themselves, which ends switching. */
+  const [sourcePickedByHand, setSourcePickedByHand] = useState(false);
 
   /**
    * A configured OMSS backend replaces the embed with a stream Movway plays
@@ -140,7 +143,22 @@ export default function WatchPage() {
   const handleProviderChange = (value: string) => {
     setProviderId(value);
     saveProviderId(value);
+    // An explicit choice ends automatic switching; being moved off a source you
+    // just picked would be baffling.
+    setSourcePickedByHand(true);
   };
+
+  /**
+   * The current source never started. Move to the next one, keeping the
+   * position, so a source that refuses this network costs a few seconds rather
+   * than the evening. Not saved — the preferred source is tried again next time
+   * rather than written off over one bad night.
+   */
+  const onNotResponding = useCallback(() => {
+    if (sourcePickedByHand) return;
+    const next = nextProviderId(provider.id);
+    if (next) setProviderId(next);
+  }, [provider.id, sourcePickedByHand]);
 
   const handleSubtitleChange = (code: string) => {
     setSubtitle(code);
@@ -306,6 +324,8 @@ export default function WatchPage() {
             onNextEpisode={isTV ? () => selectEpisode(season, episode + 1) : undefined}
             languageLabel={languageLabel}
             onCycleLanguage={cycleLanguage}
+            onNotResponding={onNotResponding}
+            lastResort={sourcePickedByHand || nextProviderId(provider.id) === null}
           />
         )}
       </div>

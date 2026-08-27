@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   VIDEO_PROVIDERS,
+  nextProviderId,
   DEFAULT_PROVIDER_ID,
   getProvider,
   loadProviderId,
@@ -10,9 +11,16 @@ import {
 beforeEach(() => window.localStorage.clear());
 
 describe("providers registry", () => {
-  it("offers VixSrc and nothing else", () => {
-    expect(VIDEO_PROVIDERS.map((p) => p.id)).toEqual(["vixsrc"]);
+  it("leads with VixSrc and keeps somewhere to fall back to", () => {
+    expect(VIDEO_PROVIDERS.map((p) => p.id)).toEqual(["vixsrc", "vidlink", "vidcore"]);
     expect(DEFAULT_PROVIDER_ID).toBe("vixsrc");
+  });
+
+  it("every source can be seeked, since that is how the controls work", () => {
+    for (const p of VIDEO_PROVIDERS) {
+      expect(p.supportsStartAt, `${p.id} cannot seek`).toBe(true);
+      expect(p.origin).toMatch(/^https:\/\//);
+    }
   });
 
   it("declares the capabilities the controls are built on", () => {
@@ -28,7 +36,7 @@ describe("providers registry", () => {
   });
 
   it("ignores a stored source that has since been removed", () => {
-    window.localStorage.setItem("movway:provider", "vidlink");
+    window.localStorage.setItem("movway:provider", "vsembed");
     expect(loadProviderId()).toBe(DEFAULT_PROVIDER_ID);
   });
 
@@ -63,5 +71,29 @@ describe("vixsrc urls", () => {
     const url = new URL(vixsrc.buildTVUrl(1399, 2, 5, { sub: "en" }));
     expect(url.origin + url.pathname).toBe("https://vixsrc.to/tv/1399/2/5");
     expect(url.searchParams.get("lang")).toBe("en");
+  });
+});
+
+describe("moving on from a source that will not play", () => {
+  it("walks the list in order", () => {
+    expect(nextProviderId("vixsrc")).toBe("vidlink");
+    expect(nextProviderId("vidlink")).toBe("vidcore");
+  });
+
+  it("reports when there is nowhere left to go", () => {
+    // The UI shows its own explanation only at this point, rather than
+    // switching silently forever.
+    expect(nextProviderId("vidcore")).toBeNull();
+  });
+
+  it("does not loop back round", () => {
+    const seen = new Set<string>();
+    let id: string | null = "vixsrc";
+    while (id) {
+      expect(seen.has(id), `revisited ${id}`).toBe(false);
+      seen.add(id);
+      id = nextProviderId(id);
+    }
+    expect(seen.size).toBe(VIDEO_PROVIDERS.length);
   });
 });

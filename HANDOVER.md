@@ -3,7 +3,7 @@
 Everything a fresh session needs to pick this up: what the app is, what was built,
 what was proven impossible and why, and the one task waiting at the front of the queue.
 
-**State:** v1.6.3 · versionCode 18 · 77 tests passing
+**State:** v1.7.0 · versionCode 19 · 81 tests passing
 
 ---
 
@@ -32,14 +32,14 @@ shouldn't be re-litigated without reason.
 | D-pad navigation | **works** | Geometric focus walker with zones. Focus lands on the player on arrival. |
 | Back button | **works** | Steps back through the app; exits only from the first screen. |
 | Native player | **needs a backend** | Movway's own `<video>` + hls.js with working controls. Active only when a streaming backend is configured. |
-| Embedded player | **works** | VixSrc is the only source. Movway draws its own controls over it: real position, working play/pause and seek — see §3. |
+| Embedded player | **works** | VixSrc leads, with VidLink and VidCore behind it as fallbacks. Movway draws its own controls over it: real position, working play/pause and seek — see §3. |
 | Streaming backend | **next up** | Needs a CinePro Core instance on an **https** address. The one outstanding task. |
 
 ---
 
 ## 3. How playback is controlled
 
-VixSrc is the only source. What it supports was **measured against the live player**, not
+VixSrc leads, with VidLink and VidCore behind it as fallbacks. What it supports was **measured against the live player**, not
 taken from its docs — and the docs were wrong in one place that mattered.
 
 | Capability | Result |
@@ -216,6 +216,11 @@ and Deno edge functions, not a long-running Node server.
   it issued hundreds of page loads in seconds and got the viewer's own IP blocked by
   Cloudflare. `EmbedPlayer` commits a scrub only after the handle settles. Any new control
   that reloads the frame needs the same treatment.
+
+- **A source refusing one browser profile is not the same as refusing the network.** A block
+  seen in Safari and Chrome was absent in a clean Chromium profile playing the same title, so
+  clearing site data for the source usually restores it. Movway moves to the next source after
+  20s of silence regardless.
 
 - **A blocked source renders its own page inside the frame, and cannot recover there.**
   Cloudflare challenges do not run in a cross-origin iframe, so once the source refuses a

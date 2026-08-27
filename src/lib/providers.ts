@@ -1,3 +1,5 @@
+import { buildMovieEmbedUrl, buildTVEpisodeEmbedUrl } from "@/lib/tmdb";
+
 /**
  * Playback sources.
  *
@@ -62,6 +64,27 @@ const vixsrcUrl = (base: string, opts: ProviderBuildOptions): string => {
   return url.toString();
 };
 
+const vidlinkUrl = (base: string, opts: ProviderBuildOptions): string => {
+  const url = new URL(base);
+  url.searchParams.set("autoplay", "true");
+  url.searchParams.set("primaryColor", ACCENT);
+  url.searchParams.set("iconColor", ACCENT);
+  if (opts.startAt && opts.startAt > 0) {
+    url.searchParams.set("startTime", String(Math.round(opts.startAt)));
+  }
+  return url.toString();
+};
+
+/**
+ * VixSrc first, then somewhere else to go.
+ *
+ * A source can simply refuse a viewer — a rate limit, a bot check, an outage —
+ * and it says so by rendering its own page inside the frame, which cannot be
+ * read from here and cannot be argued with from inside a frame either. With one
+ * source that is the end of the evening. So the alternates are back: not
+ * because VixSrc is second choice, but because "the source said no" should cost
+ * a few seconds rather than the whole app.
+ */
 export const VIDEO_PROVIDERS: VideoProvider[] = [
   {
     id: "vixsrc",
@@ -73,7 +96,41 @@ export const VIDEO_PROVIDERS: VideoProvider[] = [
     buildTVUrl: (id, season, episode, opts = {}) =>
       vixsrcUrl(`https://vixsrc.to/tv/${id}/${season}/${episode}`, opts),
   },
+  {
+    id: "vidlink",
+    name: "VidLink",
+    supportsSubtitles: false,
+    supportsStartAt: true,
+    origin: "https://vidlink.pro",
+    buildMovieUrl: (id, opts = {}) => vidlinkUrl(`https://vidlink.pro/movie/${id}`, opts),
+    buildTVUrl: (id, season, episode, opts = {}) =>
+      vidlinkUrl(`https://vidlink.pro/tv/${id}/${season}/${episode}`, opts),
+  },
+  {
+    id: "vidcore",
+    name: "VidCore",
+    supportsSubtitles: true,
+    supportsStartAt: true,
+    origin: "https://vidcore.net",
+    buildMovieUrl: (id, opts = {}) =>
+      buildMovieEmbedUrl(id, { autoPlay: true, sub: opts.sub, startAt: opts.startAt }),
+    buildTVUrl: (id, season, episode, opts = {}) =>
+      buildTVEpisodeEmbedUrl(id, season, episode, {
+        autoPlay: true,
+        nextButton: true,
+        autoNext: true,
+        sub: opts.sub,
+        startAt: opts.startAt,
+      }),
+  },
 ];
+
+/** Next source to try when the current one will not play. */
+export function nextProviderId(currentId: string): string | null {
+  const at = VIDEO_PROVIDERS.findIndex((p) => p.id === currentId);
+  const next = VIDEO_PROVIDERS[at + 1];
+  return next ? next.id : null;
+}
 
 export const DEFAULT_PROVIDER_ID = VIDEO_PROVIDERS[0].id;
 

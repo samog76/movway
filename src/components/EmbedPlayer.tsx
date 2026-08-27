@@ -35,6 +35,11 @@ interface Props {
 
   languageLabel: string;
   onCycleLanguage: () => void;
+
+  /** Fired once when the player has stayed silent long enough to call it dead. */
+  onNotResponding: () => void;
+  /** True when there is no other source left to try. */
+  lastResort: boolean;
 }
 
 function Key({
@@ -92,6 +97,8 @@ export default function EmbedPlayer({
   onNextEpisode,
   languageLabel,
   onCycleLanguage,
+  onNotResponding,
+  lastResort,
 }: Props) {
   const boxRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -131,6 +138,14 @@ export default function EmbedPlayer({
    * what to do rather than left staring at someone else's error.
    */
   const notResponding = !!embedUrl && !playback.reported && silentTooLong;
+
+  // Told once per load, so the page can move to another source.
+  const toldRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!notResponding || toldRef.current === frameKey) return;
+    toldRef.current = frameKey;
+    onNotResponding();
+  }, [notResponding, frameKey, onNotResponding]);
 
   useEffect(() => {
     const sync = () => setIsFullscreen(document.fullscreenElement === boxRef.current);
@@ -239,7 +254,7 @@ export default function EmbedPlayer({
         </div>
       )}
 
-      {notResponding && (
+      {notResponding && lastResort && (
         <div className="absolute inset-x-0 bottom-[26%] mx-auto max-w-lg border border-flare/50 bg-ink/95 px-4 py-3 text-center">
           <span className="kicker text-flare">{provider.name} is not responding</span>
           <p className="mt-1.5 font-mono text-[11px] leading-relaxed text-bone">
