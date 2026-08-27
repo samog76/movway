@@ -154,7 +154,15 @@ function cost(
     offAxis = Math.abs((to.top + to.bottom) / 2 - (from.top + from.bottom) / 2);
   } else {
     ahead = dir === "down" ? to.top - from.bottom : from.top - to.bottom;
-    offAxis = Math.abs((to.left + to.right) / 2 - (from.left + from.right) / 2);
+
+    // Horizontal *gap*, not centre distance — zero whenever the two boxes
+    // overlap at all. Centre distance punishes a control for being wide, and
+    // the widest thing on a page is usually the most important: the player
+    // spans the whole column so its centre sits mid-screen, while the link
+    // above it hugs the left margin. That 520px centre offset, tripled, made
+    // reaching the player cost 1654 against 975 for a small select far below
+    // it — so pressing down off the back link skipped straight past the video.
+    offAxis = Math.max(0, Math.max(from.left, to.left) - Math.min(from.right, to.right));
   }
 
   if (ahead < -SLACK) return null; // behind us — wrong way
@@ -367,9 +375,9 @@ function onKeyDown(event: KeyboardEvent) {
 // ── Focus seeding ────────────────────────────────────────────────────────────
 
 /** Something must always be focused, or the remote appears dead. */
-function seedFocus() {
+function seedFocus(): boolean {
   const active = document.activeElement;
-  if (active && active !== document.body && isReachable(active as HTMLElement)) return;
+  if (active && active !== document.body && isReachable(active as HTMLElement)) return true;
 
   // Reachability matters as much here as it does when moving. Picking by
   // selector alone lands on the first focusable in <main>, which is the mobile
@@ -377,7 +385,7 @@ function seedFocus() {
   // width. Focusing it does nothing at all, activeElement stays on the body,
   // and the screen comes up with no highlight anywhere: the dead-remote
   // symptom this is supposed to prevent.
-  focusFirstInMain();
+  return focusFirstInMain();
 }
 
 /**
@@ -392,11 +400,19 @@ function seedFocus() {
 export function focusFirstInMain(): boolean {
   const usable = candidates();
   const target =
+    // A page can nominate where the remote should land; the watch screen sends
+    // it to the player rather than the back link above it.
+    usable.find((c) => c.zone === "main" && c.el.hasAttribute("data-tv-autofocus")) ??
     usable.find((c) => c.zone === "main") ??
-    usable.find((c) => c.zone !== "rail") ??
-    usable[0];
-  target?.el.focus({ preventScroll: true });
-  return !!target;
+    usable.find((c) => c.zone !== "rail");
+
+  // Deliberately no fall back to the rail. Early in a route the content has
+  // often not rendered, and seeding into the menu at that moment is why the
+  // remote could start out in the sidebar with the page unreachable until you
+  // had walked the whole way down it.
+  if (!target) return false;
+  target.el.focus({ preventScroll: true });
+  return document.activeElement === target.el;
 }
 
 /**
@@ -419,9 +435,15 @@ function onFocusIn(event: FocusEvent) {
  *
  * The delay lets the incoming route paint before we look for a target.
  */
-export function seedFocusSoon(delay = 250): void {
+export function seedFocusSoon(delay = 250, attempts = 8): void {
   if (typeof window === "undefined" || !isTvDevice()) return;
-  window.setTimeout(seedFocus, delay);
+  window.setTimeout(() => {
+    // Keep trying while the page is still filling in. One shot at a fixed
+    // delay is a race the content loses on a slow stick, and losing it used to
+    // mean the remote started in the menu.
+    if (seedFocus() || attempts <= 1) return;
+    seedFocusSoon(300, attempts - 1);
+  }, delay);
 }
 
 let started = false;

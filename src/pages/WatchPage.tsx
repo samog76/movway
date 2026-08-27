@@ -13,6 +13,8 @@ import {
   VIDEO_PROVIDERS,
   SUBTITLE_LANGUAGES,
   getProvider,
+  DEFAULT_PROVIDER_ID,
+  FALLBACK_PROVIDER_ID,
   loadProviderId,
   saveProviderId,
   loadSubtitle,
@@ -20,6 +22,7 @@ import {
 } from "@/lib/providers";
 import { upsertWatchEntry } from "@/lib/continueWatching";
 import { isTvDevice } from "@/lib/tv";
+import { FALLBACK_AFTER_MS, shouldWatchForFailure } from "@/lib/sourceFallback";
 import { registerBackInterceptor } from "@/lib/backHandler";
 import { Capacitor } from "@capacitor/core";
 import EpisodePicker from "@/components/EpisodePicker";
@@ -81,6 +84,8 @@ export default function WatchPage() {
   const shieldRef = useRef<HTMLButtonElement>(null);
   const [isTv] = useState(() => isTvDevice());
   const [remoteInPlayer, setRemoteInPlayer] = useState(false);
+  const [sourcePickedByHand, setSourcePickedByHand] = useState(false);
+  const [fellBack, setFellBack] = useState(false);
 
   useEffect(() => {
     if (!movie) return;
@@ -108,6 +113,10 @@ export default function WatchPage() {
   const handleProviderChange = (value: string) => {
     setProviderId(value);
     saveProviderId(value);
+    // An explicit choice ends the automatic fall back for this title; being
+    // moved off a source you just picked would be baffling.
+    setSourcePickedByHand(true);
+    setFellBack(false);
   };
 
   const handleSubtitleChange = (code: string) => {
@@ -211,6 +220,46 @@ export default function WatchPage() {
     setRemoteInPlayer(false);
   }, [provider.id, subtitle, season, episode]);
 
+  /**
+   * Fall back to the alternate source when the default never comes up.
+   *
+   * A cross-origin embed cannot be inspected, so "is it working" has to be
+   * inferred. VidLink is the one source that talks back — it posts playback
+   * telemetry to the page — so silence for long enough is the signal. That is
+   * a heuristic, not proof: it catches a source that fails to load or is
+   * blocked, which is the case worth catching, and it deliberately leaves a
+   * source alone once the viewer has chosen it themselves.
+   */
+  useEffect(() => {
+    const watching = shouldWatchForFailure({
+      providerId: provider.id,
+      defaultProviderId: DEFAULT_PROVIDER_ID,
+      pickedByHand: sourcePickedByHand,
+      alreadyFellBack: fellBack,
+    });
+    if (!watching) return;
+
+    let heard = false;
+    const onMessage = (event: MessageEvent) => {
+      if (event.source === iframeRef.current?.contentWindow) heard = true;
+    };
+    window.addEventListener("message", onMessage);
+
+    const timer = window.setTimeout(() => {
+      if (heard) return;
+      setFellBack(true);
+      // Deliberately not saved: the viewer's preference stays the default, so
+      // the next title tries it again rather than writing off the good source
+      // over one bad load.
+      setProviderId(FALLBACK_PROVIDER_ID);
+    }, FALLBACK_AFTER_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("message", onMessage);
+    };
+  }, [provider.id, sourcePickedByHand, fellBack, season, episode, tmdbId]);
+
   return (
     <div className="space-y-8">
       <Link
@@ -230,7 +279,7 @@ export default function WatchPage() {
             <span className="h-2 w-2 rounded-full bg-violet" />
           </span>
           <span className="kicker text-muted-foreground">
-            {remoteInPlayer ? "Remote in player" : "Now Playing"}
+            {remoteInPlayer ? "Remote in player" : fellBack ? "Switched source" : "Now Playing"}
           </span>
           <span className="ml-auto truncate font-mono text-[10px] uppercase tracking-[0.14em] text-acid">
             {provider.name}
@@ -271,6 +320,7 @@ export default function WatchPage() {
             <button
               ref={shieldRef}
               type="button"
+              data-tv-autofocus
               onClick={enterPlayer}
               className="group absolute inset-0 flex items-end justify-center bg-transparent pb-[8%] transition-colors focus-visible:bg-ink/40"
               aria-label="Use the player — hands the remote to the video controls"
