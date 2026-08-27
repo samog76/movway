@@ -82,10 +82,37 @@ export function saveBackendUrl(url: string): void {
   else localStorage.removeItem(BACKEND_KEY);
 }
 
-/** A source URL is a path onto the backend's proxy, so it needs the base back. */
+/** Addresses a backend can only be describing itself with. */
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"]);
+
+/**
+ * A source URL is a path onto the backend's proxy, so it needs the base back.
+ *
+ * Some backends hand back absolute URLs instead, built from their own idea of
+ * where they live. CinePro takes that from `PUBLIC_URL`, and with it unset
+ * stamps in `http://localhost:<port>` — the address of the *server process*,
+ * which no viewer can reach. On a television it is dead twice over: loopback
+ * goes nowhere, and the packaged app blocks plain http before the request is
+ * made. The backend looks perfectly healthy the whole time.
+ *
+ * The address the viewer typed into Settings is the one demonstrably reaching
+ * the backend, so it wins over whatever the backend believes about itself. An
+ * absolute URL pointing anywhere else is a real upstream address and is left
+ * exactly as it came.
+ */
 export function resolveUrl(backendUrl: string, url: string): string {
-  if (/^https?:\/\//i.test(url)) return url;
-  return `${normaliseBackendUrl(backendUrl)}${url.startsWith("/") ? "" : "/"}${url}`;
+  const base = normaliseBackendUrl(backendUrl);
+  if (!/^https?:\/\//i.test(url)) {
+    return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+  }
+  if (!base) return url;
+  try {
+    const target = new URL(url);
+    if (!LOOPBACK_HOSTS.has(target.hostname)) return url;
+    return `${new URL(base).origin}${target.pathname}${target.search}${target.hash}`;
+  } catch {
+    return url;
+  }
 }
 
 /** Best first: highest resolution, and a stream type the browser can play. */
