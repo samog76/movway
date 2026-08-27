@@ -1,7 +1,7 @@
 {
   "name": "vite_react_shadcn_ts",
   "private": true,
-  "version": "1.5.1",
+  "version": "1.6.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "build:tv": "VITE_NATIVE=1 vite build",
     "tv:sync": "npm run build:tv && cap sync android",
-    "tv:apk": "npm run tv:sync && cd android && ./gradlew assembleRelease"
+    "tv:apk": "npm run tv:sync && cd android && ./gradlew assembleRelease",
+    "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
     "@capacitor/android": "^7.6.8",
