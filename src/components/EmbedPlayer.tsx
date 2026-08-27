@@ -211,7 +211,13 @@ export default function EmbedPlayer({
     else void boxRef.current?.requestFullscreen?.();
   }, []);
 
-  const chrome = idle && !paused ? "opacity-40" : "opacity-100";
+  /**
+   * A source asked to draw no controls of its own leaves ours as the only ones
+   * on screen, so they fade less far when idle: with the others, a viewer who
+   * loses track of ours still has the player's own underneath to fall back on.
+   */
+  const resting = provider.hidesOwnControls ? "opacity-70" : "opacity-40";
+  const chrome = idle && !paused ? resting : "opacity-100";
   const scrubMax = playback.duration && playback.duration > 0 ? Math.round(playback.duration) : 0;
 
   return (

@@ -32,6 +32,56 @@ describe("reading VixSrc telemetry", () => {
   });
 });
 
+describe("reading VidAPI telemetry", () => {
+  /**
+   * VidAPI uses the documented `data` nesting but names every field itself.
+   * This is its published payload verbatim — the scrub bar reads position and
+   * duration straight out of it.
+   */
+  const payload = (over: Record<string, unknown> = {}) => ({
+    type: "PLAYER_EVENT",
+    data: {
+      player_info: { imdb: "tt23779058", tmdb: null, mediaType: "movie" },
+      player_status: "playing",
+      player_progress: 125.4,
+      player_duration: 7200,
+      quality: { label: "1080p", width: 1920, height: 1080 },
+      ...over,
+    },
+  });
+
+  it("reads position and duration from its own field names", () => {
+    expect(parseTelemetry(payload())).toEqual({
+      event: "playing",
+      currentTime: 125.4,
+      duration: 7200,
+    });
+  });
+
+  it("reports a pause as a pause", () => {
+    expect(parseTelemetry(payload({ player_status: "paused" }))?.event).toBe("pause");
+  });
+
+  // It calls the end of a title `completed` where the others say `ended`.
+  it("translates completed into ended", () => {
+    expect(parseTelemetry(payload({ player_status: "completed" }))?.event).toBe("ended");
+  });
+
+  it("reads a seek", () => {
+    expect(parseTelemetry(payload({ player_status: "seeked" }))?.event).toBe("seeked");
+  });
+
+  it("accepts numbers sent as strings", () => {
+    const info = parseTelemetry(payload({ player_progress: "310.5", player_duration: "7200" }));
+    expect(info?.currentTime).toBe(310.5);
+    expect(info?.duration).toBe(7200);
+  });
+
+  it("ignores a status it does not know rather than inventing one", () => {
+    expect(parseTelemetry({ type: "PLAYER_EVENT", data: { player_status: "buffering" } })).toBeNull();
+  });
+});
+
 describe("formatTime", () => {
   it("formats under an hour as mm:ss", () => {
     expect(formatTime(0)).toBe("00:00");

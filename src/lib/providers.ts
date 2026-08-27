@@ -37,6 +37,19 @@ export interface VideoProvider {
   supportsSubtitles: boolean;
   /** Whether the embed URL takes a start offset, which is how seeking works. */
   supportsStartAt: boolean;
+  /**
+   * Whether the source can be asked to draw no chrome of its own, leaving
+   * Movway's controls the only ones on screen. Everywhere else we dim our
+   * controls over theirs and live with two sets.
+   */
+  hidesOwnControls?: boolean;
+  /**
+   * Whether Movway may switch to this source on its own when another refuses to
+   * play. A source the app has never seen play is fine to *offer* — the viewer
+   * may be on a network where it works — but falling back to it automatically
+   * would spend the viewer's next twenty seconds on a frame that stays black.
+   */
+  autoFallback: boolean;
   /** Origin its telemetry arrives from, for filtering `message` events. */
   origin: string;
   buildMovieUrl: (tmdbId: number, opts?: ProviderBuildOptions) => string;
@@ -76,6 +89,33 @@ const vidlinkUrl = (base: string, opts: ProviderBuildOptions): string => {
 };
 
 /**
+ * VidAPI takes `controls=false`, which no other source here offers: it draws no
+ * chrome at all, so Movway's controls are the only ones on screen instead of
+ * floating over a second set. `overlay=false` removes the hover darkening that
+ * would otherwise sit under them.
+ *
+ * Its telemetry is also the richest of the four — it reports `player_status`
+ * outright, so paused is a fact rather than something inferred from whether the
+ * position stopped moving.
+ *
+ * Note it takes TMDB ids bare (`/embed/movie/1147301`), which is what Movway
+ * already carries, so no id translation is needed.
+ */
+const vidapiUrl = (base: string, opts: ProviderBuildOptions): string => {
+  const url = new URL(base);
+  url.searchParams.set("autoplay", "1");
+  // The whole point of this source: its own controls off, ours alone on top.
+  url.searchParams.set("controls", "false");
+  url.searchParams.set("overlay", "false");
+  url.searchParams.set("primaryColor", `#${ACCENT}`);
+  if (opts.sub) url.searchParams.set("lang", opts.sub);
+  if (opts.startAt && opts.startAt > 0) {
+    url.searchParams.set("resumeAt", String(Math.round(opts.startAt)));
+  }
+  return url.toString();
+};
+
+/**
  * VixSrc first, then somewhere else to go.
  *
  * A source can simply refuse a viewer — a rate limit, a bot check, an outage —
@@ -88,6 +128,7 @@ const vidlinkUrl = (base: string, opts: ProviderBuildOptions): string => {
 export const VIDEO_PROVIDERS: VideoProvider[] = [
   {
     id: "vixsrc",
+    autoFallback: true,
     name: "VixSrc",
     supportsSubtitles: true,
     supportsStartAt: true,
@@ -98,6 +139,7 @@ export const VIDEO_PROVIDERS: VideoProvider[] = [
   },
   {
     id: "vidlink",
+    autoFallback: true,
     name: "VidLink",
     supportsSubtitles: false,
     supportsStartAt: true,
@@ -108,6 +150,7 @@ export const VIDEO_PROVIDERS: VideoProvider[] = [
   },
   {
     id: "vidcore",
+    autoFallback: true,
     name: "VidCore",
     supportsSubtitles: true,
     supportsStartAt: true,
@@ -123,12 +166,37 @@ export const VIDEO_PROVIDERS: VideoProvider[] = [
         startAt: opts.startAt,
       }),
   },
+  {
+    id: "vidapi",
+    // Offered, not auto-selected. Measured on 2026-08-27: vaplayer.ru serves its
+    // player shell (HTTP 200) but never resolves a stream — five loads, three
+    // titles, two of them listed in VidAPI's own published catalogue, framed and
+    // top-level, controls on and off, and not once did a <video> element appear.
+    // It is here because it is the only source that can be told to hide its own
+    // controls, and it may well work from a network other than the one it was
+    // tested from.
+    autoFallback: false,
+    name: "VidAPI",
+    supportsSubtitles: true,
+    supportsStartAt: true,
+    hidesOwnControls: true,
+    origin: "https://vaplayer.ru",
+    buildMovieUrl: (id, opts = {}) => vidapiUrl(`https://vaplayer.ru/embed/movie/${id}`, opts),
+    buildTVUrl: (id, season, episode, opts = {}) =>
+      vidapiUrl(`https://vaplayer.ru/embed/tv/${id}/${season}/${episode}`, opts),
+  },
 ];
 
-/** Next source to try when the current one will not play. */
+/**
+ * Next source to try when the current one will not play.
+ *
+ * Only sources the app is willing to choose by itself are candidates, so a
+ * viewer whose source just failed is never handed one that is not known to
+ * play. Picking such a source by hand stays possible.
+ */
 export function nextProviderId(currentId: string): string | null {
   const at = VIDEO_PROVIDERS.findIndex((p) => p.id === currentId);
-  const next = VIDEO_PROVIDERS[at + 1];
+  const next = VIDEO_PROVIDERS.slice(at + 1).find((p) => p.autoFallback);
   return next ? next.id : null;
 }
 

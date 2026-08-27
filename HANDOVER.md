@@ -190,6 +190,42 @@ and Deno edge functions, not a long-running Node server.
 
 ---
 
+## 6b. VidAPI — measured, offered, not trusted
+
+`vaplayer.ru` is the only source that can be told to draw **no controls of its own**
+(`controls=false&overlay=false`), which is why it is in the list: everywhere else Movway's
+controls float over a second set that the remote cannot reach.
+
+It has never been seen to play. Measured 2026-08-27 from this machine:
+
+- Five loads, three titles — including `tt23779058` from VidAPI's own documentation and
+  Fight Club, **both confirmed present in its published ID lists** (`/ids/movie_list_imdb.txt`).
+- Framed and top-level, controls on and off, parameters forwarded correctly.
+- Every load returned **HTTP 200** and rendered a spinner. Not once did a `<video>` element
+  appear, and no request to any stream-resolution API was ever issued.
+
+What it actually is: a wrapper. `vaplayer.ru` serves a shell that nests the real player at
+`nextgencloudfabric.com` and injects an ad script from a disposable `.cfd` domain plus
+histats analytics. **That ad script would ship inside the APK** if this source is used —
+weigh that before promoting it.
+
+Its first inline script is a sandbox detector, not a domain whitelist: it blanks the page if
+the origin is opaque or `localStorage`, `document.cookie` or Blob URLs throw. Movway's frame
+is not sandboxed, so it passes — that guard is not why it fails.
+
+Consequences in code:
+
+- `autoFallback: false` keeps it out of the automatic chain, so a viewer whose source just
+  failed is never handed a frame that stays black. It is still selectable by hand, and the
+  catalogue endpoints on `vidapi.ru` do work, so it may play on another network.
+- `hidesOwnControls: true` makes Movway's chrome rest at `opacity-70` instead of `40` —
+  with nothing underneath, ours are the only way to control anything.
+- `parseTelemetry` reads its field names (`player_status` / `player_progress` /
+  `player_duration`) and translates `completed` to `ended`. Its `player_status` is the only
+  source that states paused outright rather than leaving it to be inferred.
+- It still accepts **no inbound commands** — no `postMessage` receiver is documented and none
+  was found. Pause is still frame-unload, seek is still a reload with `resumeAt`.
+
 ## 7. Traps that cost real time
 
 - **An http backend silently fails on the TV.** The packaged app serves itself from

@@ -1,5 +1,5 @@
 /**
- * Reading playback out of the VixSrc embed.
+ * Reading playback out of an embedded player.
  *
  * The frame is cross-origin, so nothing here can touch its <video>. What it
  * does do is post its state outward — `PLAYER_EVENT` carrying currentTime and
@@ -27,6 +27,31 @@ export const emptyPlayback = (): Playback => ({
 
 /** Events the player emits that are worth acting on. */
 const KNOWN_EVENTS = /^(play|playing|pause|paused|seeked|seeking|ended|timeupdate)$/i;
+
+/**
+ * VidAPI reports a *status* where the others report an event name, and calls
+ * the end of a title `completed` rather than `ended`.
+ */
+const STATUS_AS_EVENT: Record<string, string> = {
+  playing: "playing",
+  paused: "pause",
+  completed: "ended",
+  seeked: "seeked",
+};
+
+/**
+ * Numbers arrive as numbers from some sources and as strings from others — the
+ * same service that returns `"rating": "7.1"` in its catalogue is not a safe bet
+ * to send `player_progress` as a number every time.
+ */
+const num = (value: unknown): number | undefined => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+};
 
 export interface Telemetry {
   event?: string;
@@ -56,9 +81,15 @@ export function parseTelemetry(data: unknown): Telemetry | null {
     (msg.data && typeof msg.data === "object" ? msg.data : null);
   const inner = (nested ?? msg) as Record<string, unknown>;
 
-  const event = typeof inner.event === "string" ? inner.event : undefined;
-  const currentTime = typeof inner.currentTime === "number" ? inner.currentTime : undefined;
-  const duration = typeof inner.duration === "number" ? inner.duration : undefined;
+  // VidAPI uses the documented `data` nesting but its own field names:
+  //   {type:"PLAYER_EVENT", data:{player_status, player_progress, player_duration}}
+  const status =
+    typeof inner.player_status === "string" ? inner.player_status.toLowerCase() : undefined;
+
+  const event =
+    typeof inner.event === "string" ? inner.event : status ? STATUS_AS_EVENT[status] : undefined;
+  const currentTime = num(inner.currentTime) ?? num(inner.player_progress);
+  const duration = num(inner.duration) ?? num(inner.player_duration);
 
   const known = event !== undefined && KNOWN_EVENTS.test(event);
   if (currentTime === undefined && duration === undefined && !known) return null;

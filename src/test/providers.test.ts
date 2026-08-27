@@ -12,7 +12,7 @@ beforeEach(() => window.localStorage.clear());
 
 describe("providers registry", () => {
   it("leads with VixSrc and keeps somewhere to fall back to", () => {
-    expect(VIDEO_PROVIDERS.map((p) => p.id)).toEqual(["vixsrc", "vidlink", "vidcore"]);
+    expect(VIDEO_PROVIDERS.map((p) => p.id)).toEqual(["vixsrc", "vidlink", "vidcore", "vidapi"]);
     expect(DEFAULT_PROVIDER_ID).toBe("vixsrc");
   });
 
@@ -94,6 +94,81 @@ describe("moving on from a source that will not play", () => {
       seen.add(id);
       id = nextProviderId(id);
     }
-    expect(seen.size).toBe(VIDEO_PROVIDERS.length);
+    // Every source the app is willing to choose for itself, and only those.
+    expect([...seen]).toEqual(VIDEO_PROVIDERS.filter((p) => p.autoFallback).map((p) => p.id));
+  });
+});
+
+describe("vidapi urls", () => {
+  const vidapi = getProvider("vidapi");
+
+  /**
+   * The reason this source is here at all: it is the only one that can be told
+   * to draw no controls, leaving Movway's as the only ones on screen. If these
+   * two parameters ever stop being sent, the viewer gets two sets of controls
+   * again and the remote starts fighting the player's own chrome.
+   */
+  it("asks the player to draw none of its own chrome", () => {
+    const url = new URL(vidapi.buildMovieUrl(603));
+    expect(url.searchParams.get("controls")).toBe("false");
+    expect(url.searchParams.get("overlay")).toBe("false");
+    expect(vidapi.hidesOwnControls).toBe(true);
+  });
+
+  it("takes a bare TMDB id, which is what Movway already carries", () => {
+    const url = new URL(vidapi.buildMovieUrl(1147301));
+    expect(url.origin + url.pathname).toBe("https://vaplayer.ru/embed/movie/1147301");
+    expect(url.searchParams.get("autoplay")).toBe("1");
+  });
+
+  it("builds an episode url from season and episode", () => {
+    const url = new URL(vidapi.buildTVUrl(205715, 1, 3));
+    expect(url.origin + url.pathname).toBe("https://vaplayer.ru/embed/tv/205715/1/3");
+  });
+
+  // VidAPI spells the start offset `resumeAt`; sending `startAt` would be
+  // accepted as an alias, but seeking is the one thing that must not go quiet.
+  it("seeks with resumeAt, rounded to whole seconds", () => {
+    const url = new URL(vidapi.buildMovieUrl(603, { startAt: 300.6 }));
+    expect(url.searchParams.get("resumeAt")).toBe("301");
+  });
+
+  it("omits the offset at the start of a title", () => {
+    expect(new URL(vidapi.buildMovieUrl(603)).searchParams.get("resumeAt")).toBeNull();
+    expect(new URL(vidapi.buildMovieUrl(603, { startAt: 0 })).searchParams.get("resumeAt")).toBeNull();
+  });
+
+  it("passes a language through and themes the player", () => {
+    const url = new URL(vidapi.buildMovieUrl(603, { sub: "fr" }));
+    expect(url.searchParams.get("lang")).toBe("fr");
+    expect(url.searchParams.get("primaryColor")).toBe("#CCFF00");
+  });
+});
+
+describe("only one source hides its own controls", () => {
+  it("keeps the others honest about drawing their own chrome", () => {
+    const hiding = VIDEO_PROVIDERS.filter((p) => p.hidesOwnControls).map((p) => p.id);
+    expect(hiding).toEqual(["vidapi"]);
+  });
+});
+
+describe("a source the app will offer but not choose", () => {
+  /**
+   * VidAPI was never seen to play from the network it was tested on: its shell
+   * loads and no video ever appears. Automatic failover therefore skips it —
+   * being handed a source that stays black is worse than being told there is
+   * nowhere left to go.
+   */
+  it("is left out of the automatic chain", () => {
+    expect(getProvider("vidapi").autoFallback).toBe(false);
+    expect(nextProviderId("vidcore")).toBeNull();
+    expect(nextProviderId("vixsrc")).toBe("vidlink");
+    expect(nextProviderId("vidlink")).toBe("vidcore");
+  });
+
+  it("can still be chosen by hand and remembered", () => {
+    saveProviderId("vidapi");
+    expect(loadProviderId()).toBe("vidapi");
+    expect(getProvider("vidapi").name).toBe("VidAPI");
   });
 });
