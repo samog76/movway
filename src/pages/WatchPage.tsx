@@ -81,14 +81,6 @@ export default function WatchPage() {
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  /**
-   * Playing the embed is done through its URL, because that is the only
-   * channel it answers to. Pausing tears the frame down, which genuinely stops
-   * playback; resuming puts it back at the offset it was torn down on.
-   */
-  const [paused, setPaused] = useState(false);
-  const [startAt, setStartAt] = useState(0);
-  const [reloadNonce, setReloadNonce] = useState(0);
   /** Set once the viewer chooses a source themselves, which ends switching. */
   const [sourcePickedByHand, setSourcePickedByHand] = useState(false);
 
@@ -130,15 +122,10 @@ export default function WatchPage() {
   }, [movie, season, episode, tmdbId, isTV]);
 
   const title = movie?.title || movie?.name || "Loading…";
-  const embedOptions = {
-    sub: subtitle || undefined,
-    startAt: startAt > 0 ? startAt : undefined,
-  };
-  const embedUrl = paused
-    ? ""
-    : isTV
-      ? provider.buildTVUrl(tmdbId, season, episode, embedOptions)
-      : provider.buildMovieUrl(tmdbId, embedOptions);
+  const embedOptions = { sub: subtitle || undefined };
+  const embedUrl = isTV
+    ? provider.buildTVUrl(tmdbId, season, episode, embedOptions)
+    : provider.buildMovieUrl(tmdbId, embedOptions);
 
   const handleProviderChange = (value: string) => {
     setProviderId(value);
@@ -207,60 +194,16 @@ export default function WatchPage() {
   // ── Playback control ────────────────────────────────────────────────────
 
   /** Anything here changes the loaded stream, so the position tracker resets. */
-  const resetKey = `${provider.id}|${subtitle}|${season}|${episode}|${startAt}|${reloadNonce}`;
+  const resetKey = `${provider.id}|${subtitle}|${season}|${episode}`;
 
   const playback = useEmbedPlayback({
     iframeRef,
     origin: provider.origin,
     resetKey,
     titleKey: `${type}|${tmdbId}|${season}|${episode}`,
-    baseline: startAt,
-    paused,
+    baseline: 0,
+    paused: false,
   });
-
-  /**
-   * Pausing unloads the frame, which is the only thing that reliably stops a
-   * player that ignores commands. Resuming reloads it at the position it was
-   * stopped on, which the provider's `startAt` makes exact.
-   */
-  const togglePlay = useCallback(() => {
-    setPaused((wasPaused) => {
-      if (wasPaused) {
-        setReloadNonce((n) => n + 1);
-        return false;
-      }
-      setStartAt(Math.max(0, Math.round(playback.position)));
-      return true;
-    });
-  }, [playback.position]);
-
-  const seekTo = useCallback((seconds: number) => {
-    setStartAt(Math.max(0, Math.round(seconds)));
-    setPaused(false);
-    setReloadNonce((n) => n + 1);
-  }, []);
-
-  const seekBy = useCallback(
-    (delta: number) => seekTo(playback.position + delta),
-    [seekTo, playback.position]
-  );
-
-  const restart = useCallback(() => seekTo(0), [seekTo]);
-
-  const cycleLanguage = useCallback(() => {
-    const at = SUBTITLE_LANGUAGES.findIndex((l) => l.code === subtitle);
-    handleSubtitleChange(SUBTITLE_LANGUAGES[(at + 1) % SUBTITLE_LANGUAGES.length].code);
-    setStartAt(Math.max(0, Math.round(playback.position)));
-  }, [subtitle, playback.position]);
-
-  const languageLabel =
-    SUBTITLE_LANGUAGES.find((l) => l.code === subtitle)?.label ?? "Default";
-
-  // A different title starts from the beginning, playing.
-  useEffect(() => {
-    setStartAt(0);
-    setPaused(false);
-  }, [tmdbId, season, episode]);
 
   // A new title deserves a fresh attempt at the good path.
   useEffect(() => {
@@ -288,7 +231,7 @@ export default function WatchPage() {
             <span className="h-2 w-2 rounded-full bg-violet" />
           </span>
           <span className="kicker text-muted-foreground">
-            {paused ? "Paused" : "Now Playing"}
+            Now Playing
           </span>
           <span className="ml-auto truncate font-mono text-[10px] uppercase tracking-[0.14em] text-acid">
             {useNativePlayer ? streams?.sources[0]?.provider?.name ?? "Direct" : provider.name}
@@ -313,17 +256,6 @@ export default function WatchPage() {
             iframeRef={iframeRef}
             provider={provider}
             playback={playback}
-            paused={paused}
-            onTogglePlay={togglePlay}
-            onSeekTo={seekTo}
-            onSeekBy={seekBy}
-            onRestart={restart}
-            onPrevEpisode={
-              isTV && episode > 1 ? () => selectEpisode(season, episode - 1) : undefined
-            }
-            onNextEpisode={isTV ? () => selectEpisode(season, episode + 1) : undefined}
-            languageLabel={languageLabel}
-            onCycleLanguage={cycleLanguage}
             onNotResponding={onNotResponding}
             lastResort={sourcePickedByHand || nextProviderId(provider.id) === null}
           />
