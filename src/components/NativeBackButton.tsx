@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useLocation, useNavigate, useNavigationType } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
-import { runBackInterceptors } from "@/lib/backHandler";
+import { runBackInterceptors, setRouterBackHandlerReady } from "@/lib/backHandler";
 
 /**
  * Gives the hardware Back button the behaviour a TV viewer expects: step back
@@ -78,12 +78,17 @@ export default function NativeBackButton() {
 
       void App.exitApp();
     }).then((handle) => {
-      if (cancelled) void handle.remove();
-      else remove = () => void handle.remove();
+      if (cancelled) {
+        void handle.remove();
+        return;
+      }
+      remove = () => void handle.remove();
+      setRouterBackHandlerReady(true);
     });
 
     return () => {
       cancelled = true;
+      setRouterBackHandlerReady(false);
       remove?.();
     };
     // Attached once for the life of the component — see the refs above.

@@ -122,13 +122,19 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     if (!focusWithin || pinned) return;
     return registerBackInterceptor(() => {
       const back = lastPageFocus.current;
+      let left = false;
       if (back && document.contains(back)) {
         back.focus();
-      } else {
-        // Must land on something focusable, or the rail hides with the remote
-        // still nominally inside it and nothing highlighted anywhere.
-        focusFirstInMain();
+        left = document.activeElement === back;
       }
+      // Must land on something that can genuinely hold focus, or the rail
+      // slides shut with the remote still inside it and nothing highlighted.
+      if (!left) left = focusFirstInMain();
+
+      // Nowhere to go: leave the menu open and let Back mean what it usually
+      // means, rather than swallowing the press and stranding the viewer.
+      if (!left) return false;
+
       setFocusWithin(false);
       return true;
     });

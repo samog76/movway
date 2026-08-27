@@ -42,3 +42,24 @@ export function runBackInterceptors(): boolean {
 export function clearBackInterceptors(): void {
   interceptors.length = 0;
 }
+
+/**
+ * Whether the router's Back handler is live yet.
+ *
+ * The Android plugin registers its callback with the Activity before the
+ * WebView loads anything, and that callback is *enabled*, so it consumes the
+ * press rather than letting the Activity finish. Until React has mounted and
+ * subscribed there is no listener to act on it, which leaves Back doing
+ * nothing during startup — and doing nothing forever if the bundle never
+ * boots. main.tsx therefore installs a plain exit handler up front, and this
+ * flag is how it knows to stand down once the real one takes over.
+ */
+let routerHandlerReady = false;
+
+export function setRouterBackHandlerReady(ready: boolean): void {
+  routerHandlerReady = ready;
+}
+
+export function isRouterBackHandlerReady(): boolean {
+  return routerHandlerReady;
+}

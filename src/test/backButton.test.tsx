@@ -19,6 +19,8 @@ import {
   registerBackInterceptor,
   runBackInterceptors,
   clearBackInterceptors,
+  isRouterBackHandlerReady,
+  setRouterBackHandlerReady,
 } from "@/lib/backHandler";
 
 /** Exposes the router's navigate so a test can move between screens. */
@@ -70,6 +72,7 @@ async function open(startAt: string) {
 
 beforeEach(() => {
   clearBackInterceptors();
+  setRouterBackHandlerReady(false);
   addListener.mockReset();
   exitApp.mockReset();
   isNativePlatform.mockReturnValue(true);
@@ -199,6 +202,32 @@ describe("hardware back on a TV", () => {
 
     // One press leaves search entirely rather than walking back through "du".
     expect(app.path()).toBe("/");
+  });
+
+  it("announces itself so the boot-time handler stands down", async () => {
+    expect(isRouterBackHandlerReady()).toBe(false);
+
+    await open("/");
+
+    // main.tsx installs a plain exitApp handler before React mounts, because
+    // the native callback swallows Back until a JS listener exists. It checks
+    // this flag so the two never both act on one press.
+    expect(isRouterBackHandlerReady()).toBe(true);
+  });
+
+  it("hands the fallback back when it goes away", async () => {
+    addListener.mockReturnValue(Promise.resolve({ remove: vi.fn() }));
+    const { unmount } = render(
+      <MemoryRouter initialEntries={["/"]}>
+        <NativeBackButton />
+      </MemoryRouter>
+    );
+    await act(async () => {});
+    expect(isRouterBackHandlerReady()).toBe(true);
+
+    unmount();
+
+    expect(isRouterBackHandlerReady()).toBe(false);
   });
 
   it("does not touch the hardware button in a browser", async () => {
