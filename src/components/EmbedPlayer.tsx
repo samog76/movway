@@ -109,13 +109,28 @@ export default function EmbedPlayer({
    * than saying nothing at all.
    */
   const [graceOver, setGraceOver] = useState(false);
+  const [silentTooLong, setSilentTooLong] = useState(false);
   useEffect(() => {
     setGraceOver(false);
-    const timer = window.setTimeout(() => setGraceOver(true), 6000);
-    return () => window.clearTimeout(timer);
+    setSilentTooLong(false);
+    const settling = window.setTimeout(() => setGraceOver(true), 6000);
+    const stalled = window.setTimeout(() => setSilentTooLong(true), 20000);
+    return () => {
+      window.clearTimeout(settling);
+      window.clearTimeout(stalled);
+    };
   }, [frameKey]);
 
   const waiting = !!embedUrl && !playback.reported && !graceOver;
+
+  /**
+   * The frame loaded but the player never reported in. The usual cause is the
+   * source refusing this network — a rate-limit or bot check — which renders
+   * its own page inside the frame. That page cannot be read from here, and its
+   * challenge cannot be completed inside a frame either, so the viewer is shown
+   * what to do rather than left staring at someone else's error.
+   */
+  const notResponding = !!embedUrl && !playback.reported && silentTooLong;
 
   useEffect(() => {
     const sync = () => setIsFullscreen(document.fullscreenElement === boxRef.current);
@@ -221,6 +236,18 @@ export default function EmbedPlayer({
           <span className="kicker text-bone">
             {playback.position > 1 ? `Resuming at ${formatTime(playback.position)}` : "Starting"}
           </span>
+        </div>
+      )}
+
+      {notResponding && (
+        <div className="absolute inset-x-0 bottom-[26%] mx-auto max-w-lg border border-flare/50 bg-ink/95 px-4 py-3 text-center">
+          <span className="kicker text-flare">{provider.name} is not responding</span>
+          <p className="mt-1.5 font-mono text-[11px] leading-relaxed text-bone">
+            It usually means the source is refusing this network. Open{" "}
+            <span className="text-acid">{provider.origin.replace("https://", "")}</span> in a
+            browser tab, pass its check, then come back — it cannot be cleared from inside the
+            player.
+          </p>
         </div>
       )}
 

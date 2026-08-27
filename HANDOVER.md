@@ -3,7 +3,7 @@
 Everything a fresh session needs to pick this up: what the app is, what was built,
 what was proven impossible and why, and the one task waiting at the front of the queue.
 
-**State:** v1.6.2 · versionCode 17 · 77 tests passing
+**State:** v1.6.3 · versionCode 18 · 77 tests passing
 
 ---
 
@@ -216,6 +216,12 @@ and Deno edge functions, not a long-running Node server.
   it issued hundreds of page loads in seconds and got the viewer's own IP blocked by
   Cloudflare. `EmbedPlayer` commits a scrub only after the handle settles. Any new control
   that reloads the frame needs the same treatment.
+
+- **A blocked source renders its own page inside the frame, and cannot recover there.**
+  Cloudflare challenges do not run in a cross-origin iframe, so once the source refuses a
+  network the embed shows that refusal forever. Clearing it means visiting the source
+  top-level in a browser and passing the check. `EmbedPlayer` says so on screen after 20s of
+  silence rather than leaving a third-party error page unexplained.
 
 - **`npx tsc --noEmit` checks nothing.** `tsconfig.json` has `"files": []` and only project
   references, so that command silently passes with real type errors present. It hid three.
