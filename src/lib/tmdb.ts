@@ -1,3 +1,5 @@
+import { Capacitor, CapacitorHttp } from "@capacitor/core";
+
 const TMDB_API_KEY =
   (import.meta.env.VITE_TMDB_API_KEY as string | undefined) ||
   "2dca580c2a14b55200e784d157207b4d";
@@ -13,10 +15,32 @@ export const img = (path: string | null, size = "w500") =>
 
 export const backdrop = (path: string | null) => img(path, "original");
 
+/**
+ * On Android the app is served from `https://localhost`, so every TMDB call is
+ * a cross-origin request made by the WebView. That path is the one that breaks
+ * in a packaged build — the page and its assets load from the bundle, then each
+ * API request fails, which reads as "the app is broken" when the app is fine.
+ *
+ * Native HTTP sidesteps it: the request is made by the platform rather than the
+ * WebView, so WebView-level origin and network policy never enter into it. Web
+ * builds keep using plain fetch.
+ */
 async function tmdb<T>(endpoint: string, params: Record<string, string> = {}): Promise<T> {
   const url = new URL(`${BASE}${endpoint}`);
   url.searchParams.set("api_key", TMDB_API_KEY);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+
+  if (Capacitor.isNativePlatform()) {
+    const res = await CapacitorHttp.get({
+      url: url.toString(),
+      headers: { Accept: "application/json" },
+    });
+    if (res.status < 200 || res.status >= 300) throw new Error(`TMDB ${res.status}`);
+    // The native bridge hands back parsed JSON for a JSON content type, but a
+    // string when it cannot tell; accept either rather than assume.
+    return (typeof res.data === "string" ? JSON.parse(res.data) : res.data) as T;
+  }
+
   const res = await fetch(url.toString());
   if (!res.ok) throw new Error(`TMDB ${res.status}`);
   return res.json();
