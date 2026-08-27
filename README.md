@@ -11,6 +11,10 @@ Ships in two forms:
 
 ---
 
+> **Picking this up fresh?** Read [HANDOVER.md](HANDOVER.md) first. It covers what the app
+> is, what was measured to be impossible inside the embedded players (and why), the one task
+> outstanding, and the traps that cost real time.
+
 ## Web app
 
 ```bash
