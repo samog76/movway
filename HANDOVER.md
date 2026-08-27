@@ -1,7 +1,7 @@
 # Movway — handover
 
 Everything a fresh session needs to pick this up: what the app is, what was built,
-what was proven impossible and why, and the one task waiting at the front of the queue.
+what was proven impossible and why, and where the work stands.
 
 **State:** v1.5.1 · versionCode 14 · 77 tests passing · `main` @ c217628
 
@@ -31,9 +31,9 @@ shouldn't be re-litigated without reason.
 | Browsing & search | **works** | Home, Browse, Search, watch page with episode picker and cast. Search keeps its query in the URL so Back returns to results. |
 | D-pad navigation | **works** | Geometric focus walker with zones. Focus lands on the player on arrival. |
 | Back button | **works** | Steps back through the app; exits only from the first screen. |
-| Native player | **needs a backend** | Movway's own `<video>` + hls.js with working controls. Active only when a streaming backend is configured. |
+| Native player | **backend is up** | Movway's own `<video>` + hls.js with working controls. Active once the backend address is set in Settings. |
 | Embedded players | **picture only** | VidLink (default) and VidCore in an iframe, with automatic fallback. No playback control is possible — see §3. |
-| Streaming backend | **next up** | Needs a CinePro Core instance on an **https** address. The one outstanding task. |
+| Streaming backend | **deployed** | CinePro Core on Render at `https://cinepro-core-5kv0.onrender.com`. Enter it in Settings on each device. |
 
 ---
 
@@ -74,67 +74,74 @@ landed on exactly `300s` of a 635s title.
 
 So: **the embed path gives a picture and nothing else.** Its on-screen chrome can change
 source, change episode and go fullscreen, but not pause. The backend path is the only
-arrangement where a remote controls playback, and it is already built and tested — it just
-needs a backend to point at.
+arrangement where a remote controls playback, and the backend it needs is now deployed
+(§4).
 
 ---
 
-## 4. The one task outstanding
+## 4. The streaming backend
 
-Stand up a **CinePro Core** instance ([docs.cinepro.cc](https://docs.cinepro.cc)) and put
-its address into Movway's Settings. Everything on the app side is finished and waiting.
+A **CinePro Core** instance ([docs.cinepro.cc](https://docs.cinepro.cc)) is deployed and live:
 
-> ### Read before deploying
->
-> In a previous session the Render and Supabase connectors were authenticated as a
-> **different person's accounts** (`ogheneovosegba360@gmail.com` / "thatcrazydave's Org"),
-> not the repo owner's. A `cinepro-core` service was created there by mistake and needs
-> deleting by that account holder — the Render MCP has no delete tool, and the owner sees
-> "Access denied".
->
-> **Confirm which account a connector is signed in to before creating, deploying, or
-> spending anything.**
+| | |
+|---|---|
+| Address | `https://cinepro-core-5kv0.onrender.com` |
+| Render service | `cinepro-core` · `srv-da87phifngtc73bldgl0` · Frankfurt · **free** plan |
+| Source | `github.com/samog76/core` @ `98ba005`, auto-deploy **off** |
+| Workspace | `rebel.game09@gmail.com` — the owner's own account, confirmed before creating |
 
-### Steps
+Point a device at it with Settings → Streaming backend → the https URL → **Test
+connection**, which should report `CinePro` and its version. The watch page then uses the
+native player automatically. The address lives in that device's `localStorage`, so it has
+to be entered on each device — there is no default in the code, by design.
 
-1. **Confirm the Render account is yours.** List workspaces and check the email against
-   your own before doing anything else. If it isn't yours, stop and reconnect Render in
-   your Claude connector settings.
+### How it is configured, and why
 
-2. **Deploy CinePro Core.** Render only deploys repos connected to your GitHub, so use the
-   existing fork at `github.com/samog76/core`. It is a Node service, not Docker.
+```
+# Build and start
+npm install --include=dev && npm run build
+node dist/server.js
 
-   ```
-   # Build and start commands
-   npm install && npm run build
-   npm run start
+# Environment
+NODE_ENV=production
+HOST=0.0.0.0
+CORS_ORIGIN=*
+CACHE_TYPE=memory
+NPM_CONFIG_INCLUDE=dev
+PUBLIC_URL=https://cinepro-core-5kv0.onrender.com
+TMDB_API_KEY=<the key that is also the fallback in src/lib/tmdb.ts>
+```
 
-   # Environment
-   NODE_ENV=production
-   HOST=0.0.0.0
-   CORS_ORIGIN=*
-   CACHE_TYPE=memory
-   PUBLIC_URL=https://<your-service>.onrender.com
-   NPM_CONFIG_INCLUDE=dev   # see step 3
-   TMDB_API_KEY=<your key — add it yourself in the dashboard>
-   ```
+Three of those are load-bearing and were each confirmed against a real deploy:
 
-3. **Work around CinePro's blueprint bug.** Their published `render.yaml` sets
-   `NODE_ENV=production`, which makes `npm install` skip devDependencies. `@types/node`
-   never installs and the TypeScript build dies with ~30 errors like
-   `Cannot find name 'process'`. Setting `NPM_CONFIG_INCLUDE=dev` fixes it.
+- **`NPM_CONFIG_INCLUDE=dev` / `--include=dev`.** CinePro's own `render.yaml` sets
+  `NODE_ENV=production`, which makes npm set `omit=dev`. `@types/node` never installs and
+  `tsc` dies with ~30 errors like `Cannot find name 'process'`. Reproduced exactly, and
+  fixed by including dev dependencies.
 
-4. **Point Movway at it.** Settings → Streaming backend → the https URL → **Test
-   connection**. It should report the backend's name and version. The watch page then uses
-   the native player automatically.
+- **`HOST=0.0.0.0`.** `src/server.ts` defaults to `localhost`, which Render cannot route
+  to, so the service would build and then fail its health check.
 
-### Worth weighing first
+- **`PUBLIC_URL`.** Without it the server logs `Proxy base URL: http://localhost:10000`
+  and hands back source and subtitle URLs on that address — unreachable, and `http`, which
+  the TV blocks anyway. With it set the log reads
+  `Proxy base URL: https://cinepro-core-5kv0.onrender.com`. This one is easy to miss
+  because the service looks healthy either way.
 
-Render's free plan sleeps after ~15 minutes idle, so the first title after a break waits
-~50s on a cold start — genuinely irritating on a TV. Starter (~$7/mo) stays warm. A
-**Cloudflare Tunnel to a machine at home** is also a strong option: free, a real https
-hostname, and no cold starts. Supabase is **not** viable — it hosts Postgres, Auth, Storage
-and Deno edge functions, not a long-running Node server.
+The start command is `node dist/server.js`, **not** the project's own `npm run start`. That
+script is `npm run build && node dist/server.js`, so it reruns `tsc` on every cold start —
+wasteful anywhere, and the free plan already sleeps after ~15 minutes idle, so the first
+title after a break waits on a cold start. Starter (~$7/mo) stays warm; a Cloudflare Tunnel
+to a machine at home is the other good option. Supabase is **not** viable — it hosts
+Postgres, Auth, Storage and Deno edge functions, not a long-running Node server.
+
+Auto-deploy is off, so upstream changes to the fork will not ship by themselves.
+
+> **Confirm which account a connector is signed in to before creating or spending
+> anything.** An earlier session had Render and Supabase authenticated as a *different
+> person's* accounts (`ogheneovosegba360@gmail.com` / "thatcrazydave's Org") and created a
+> stray `cinepro-core` service there, which only that account holder can delete. The
+> workspace used here was checked against the owner's own email first.
 
 ---
 
@@ -231,7 +238,7 @@ grep -rho "some-string-from-your-change" /tmp/check/assets/public/assets/*.js | 
 
 ---
 
-## 9. Worth doing after the backend is up
+## 9. Worth doing next
 
 - **Cast and footer are unreachable with a remote.** Cast entries are plain `<div>`s with no
   tabindex, so the D-pad can't scroll to them.
