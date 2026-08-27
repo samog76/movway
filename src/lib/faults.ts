@@ -72,3 +72,58 @@ export function describeFault(error: unknown): Fault {
     hint: "An unexpected error. The detail line above is the raw message.",
   };
 }
+
+/**
+ * The same idea, for the streaming backend.
+ *
+ * Movway plays every title through its own player, so when a title will not
+ * come up the backend is the thing to interrogate — and the wording above is
+ * all about TMDB, which would send anyone reading it off in the wrong
+ * direction.
+ */
+export function describeBackendFault(error: unknown): Fault {
+  const message = error instanceof Error ? error.message : String(error ?? "unknown error");
+  const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+  const isNetwork = /failed to fetch|load failed|networkerror|network request failed/i.test(
+    message
+  );
+
+  if (offline) {
+    return {
+      cause: "This device is offline",
+      detail: message,
+      hint: "Android reports no network connection. Reconnect the TV to Wi-Fi and reopen Movway.",
+    };
+  }
+
+  if (isNetwork) {
+    return {
+      cause: "Cannot reach the streaming backend",
+      detail: message,
+      hint:
+        "The request never completed, so this is the address or the backend rather than the title. Check it under Settings, confirm the backend is running, and note that it must be https — the packaged app blocks a plain http address before the request is made. A backend that sleeps when idle can also take up to a minute to wake.",
+    };
+  }
+
+  const status = message.match(/OMSS (\d{3})/)?.[1];
+  if (status === "404") {
+    return {
+      cause: "The backend knows nothing about this title",
+      detail: message,
+      hint: "It answered, but has no source for this TMDB id. Try a well-known title to tell this apart from a backend that is broken for everything.",
+    };
+  }
+  if (status) {
+    return {
+      cause: `The backend returned ${status}`,
+      detail: message,
+      hint: "It is reachable but failed to answer properly. Its own logs will say why — a missing or rejected TMDB key is the usual cause.",
+    };
+  }
+
+  return {
+    cause: "Could not load from the streaming backend",
+    detail: message,
+    hint: "An unexpected error. The detail line above is the raw message.",
+  };
+}

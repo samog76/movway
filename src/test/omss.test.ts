@@ -56,6 +56,41 @@ describe("resolving proxy paths", () => {
     const abs = "https://cdn.example.com/stream.m3u8";
     expect(resolveUrl("http://nas.local:3000", abs)).toBe(abs);
   });
+
+  /**
+   * A backend with no PUBLIC_URL set describes its own proxy as localhost.
+   * That address means "this machine" to whoever reads it, so on a TV it
+   * resolves to the TV, and nothing plays. Settings knows the real one.
+   */
+  it("re-points a loopback proxy url at the address that reached the backend", () => {
+    expect(
+      resolveUrl("https://abc.trycloudflare.com", "http://localhost:8099/v1/proxy?data=%7B%22a%22%3A1%7D")
+    ).toBe("https://abc.trycloudflare.com/v1/proxy?data=%7B%22a%22%3A1%7D");
+  });
+
+  it("treats every loopback spelling the same way", () => {
+    for (const host of ["localhost", "127.0.0.1", "0.0.0.0"]) {
+      expect(resolveUrl("https://tv.example.com", `http://${host}:8099/v1/proxy?data=x`)).toBe(
+        "https://tv.example.com/v1/proxy?data=x"
+      );
+    }
+  });
+
+  it("keeps the query intact, since the proxy carries its payload there", () => {
+    const data = "%7B%22url%22%3A%22https%3A%2F%2Ffsharetv.cc%2Fapi%2Fmedia%2Fabc%22%7D";
+    expect(resolveUrl("https://abc.trycloudflare.com", `http://localhost:8099/v1/proxy?data=${data}`)).toBe(
+      `https://abc.trycloudflare.com/v1/proxy?data=${data}`
+    );
+  });
+
+  it("does not touch a real upstream host that merely looks local", () => {
+    const abs = "https://localhost.cdn.example.com/stream.m3u8";
+    expect(resolveUrl("https://abc.trycloudflare.com", abs)).toBe(abs);
+  });
+
+  it("leaves a malformed url alone rather than throwing", () => {
+    expect(resolveUrl("https://abc.trycloudflare.com", "http://")).toBe("http://");
+  });
 });
 
 describe("choosing a source", () => {

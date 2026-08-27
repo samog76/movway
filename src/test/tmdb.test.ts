@@ -105,31 +105,3 @@ describe("tmdb – getTrending (all/week)", () => {
     expect(calledUrl).toContain("/trending/all/week");
   });
 });
-
-describe("tmdb embed URL builders", () => {
-  it("builds movie and TV URLs for vidcore with autoplay enabled by default", async () => {
-    const { buildMovieEmbedUrl, buildTVEpisodeEmbedUrl } = await import("@/lib/tmdb");
-
-    expect(buildMovieEmbedUrl(123)).toBe("https://vidcore.net/movie/123?autoPlay=true");
-    expect(buildTVEpisodeEmbedUrl(123, 2, 5)).toBe("https://vidcore.net/tv/123/2/5?autoPlay=true");
-  });
-
-  it("applies custom query parameters for movie and TV embeds", async () => {
-    const { buildMovieEmbedUrl, buildTVEpisodeEmbedUrl } = await import("@/lib/tmdb");
-
-    expect(
-      buildMovieEmbedUrl(533535, { theme: "16A085", autoPlay: false, sub: "en", hideServer: true })
-    ).toBe("https://vidcore.net/movie/533535?autoPlay=false&theme=16A085&sub=en&hideServer=true");
-    expect(
-      buildTVEpisodeEmbedUrl(63174, 1, 5, { autoNext: true, nextButton: true, server: "Server 1" })
-    ).toBe("https://vidcore.net/tv/63174/1/5?autoPlay=true&autoNext=true&nextButton=true&server=Server+1");
-  });
-
-  it("omits undefined parameters while preserving valid falsey values", async () => {
-    const { buildMovieEmbedUrl } = await import("@/lib/tmdb");
-
-    expect(
-      buildMovieEmbedUrl(533535, { title: false, poster: false, startAt: 0, theme: undefined })
-    ).toBe("https://vidcore.net/movie/533535?autoPlay=true&title=false&poster=false&startAt=0");
-  });
-});

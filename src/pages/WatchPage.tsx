@@ -9,50 +9,34 @@ import {
   type MovieDetails,
   type TVDetails,
 } from "@/lib/tmdb";
-import {
-  VIDEO_PROVIDERS,
-  SUBTITLE_LANGUAGES,
-  getProvider,
-  DEFAULT_PROVIDER_ID,
-  FALLBACK_PROVIDER_ID,
-  loadProviderId,
-  saveProviderId,
-  loadSubtitle,
-  saveSubtitle,
-} from "@/lib/providers";
 import { upsertWatchEntry } from "@/lib/continueWatching";
-import { isTvDevice } from "@/lib/tv";
 import NativePlayer from "@/components/NativePlayer";
+import FaultReport from "@/components/FaultReport";
+import { describeBackendFault } from "@/lib/faults";
 import { fetchEpisodeSources, fetchMovieSources, loadBackendUrl } from "@/lib/omss";
-import { FALLBACK_AFTER_MS, shouldWatchForFailure } from "@/lib/sourceFallback";
-import { registerBackInterceptor } from "@/lib/backHandler";
-import { Capacitor } from "@capacitor/core";
 import EpisodePicker from "@/components/EpisodePicker";
-import { ArrowLeft, Play, Star } from "lucide-react";
-import { useState, useEffect, useMemo, useRef, useCallback, ReactNode } from "react";
+import { ArrowLeft, Star } from "lucide-react";
+import { useState, useEffect, useMemo, useCallback, ReactNode } from "react";
 
-/** A bordered control slab — the only form idiom in this UI. */
-function Control({
-  label,
+/** A notice in the projector frame, where the picture would otherwise be. */
+function Placard({
+  kicker,
   children,
-  hint,
 }: {
-  label: string;
+  kicker: string;
   children: ReactNode;
-  hint?: string;
 }) {
   return (
-    <label className="group flex items-stretch border border-border transition-colors focus-within:border-acid" title={hint}>
-      <span className="flex items-center bg-secondary px-3 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-        {label}
-      </span>
-      {children}
-    </label>
+    <div className="flex aspect-video w-full items-center justify-center bg-ink px-4">
+      <div className="max-w-2xl text-center">
+        <span className="kicker text-flare">{kicker}</span>
+        <div className="mt-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+          {children}
+        </div>
+      </div>
+    </div>
   );
 }
-
-const selectClass =
-  "bg-card px-3 py-2 font-mono text-[11px] uppercase tracking-[0.08em] text-bone focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed";
 
 export default function WatchPage() {
   const { type, id } = useParams<{ type: string; id: string }>();
@@ -77,27 +61,26 @@ export default function WatchPage() {
 
   const [season, setSeason] = useState(1);
   const [episode, setEpisode] = useState(1);
-  const [providerId, setProviderId] = useState(() => loadProviderId());
-  const [subtitle, setSubtitle] = useState(() => loadSubtitle());
-
-  const provider = getProvider(providerId);
-
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const shieldRef = useRef<HTMLButtonElement>(null);
-  const [isTv] = useState(() => isTvDevice());
-  const [remoteInPlayer, setRemoteInPlayer] = useState(false);
-  const [sourcePickedByHand, setSourcePickedByHand] = useState(false);
 
   /**
-   * A configured OMSS backend replaces the embed with a stream Movway plays
-   * itself, which is the only arrangement where its own controls actually do
-   * anything. With none set, or if nothing it returns will play, the embed
-   * stays exactly as it was.
+   * Every title plays through Movway's own player, fed by an OMSS backend.
+   *
+   * The embedded third-party players this page used to fall back to are gone.
+   * They could only ever show a picture: they accept no commands, expose no
+   * keyboard handling, and cannot be reached into, so no remote could pause
+   * one. Keeping them as a fallback also hid a broken backend behind a working
+   * picture, which made the backend impossible to test — a title that plays is
+   * now a title the backend actually served.
    */
   const [backendUrl] = useState(() => loadBackendUrl());
   const [nativeUnplayable, setNativeUnplayable] = useState<string | null>(null);
 
-  const { data: streams, isError: streamsError } = useQuery({
+  const {
+    data: streams,
+    isError: streamsFailed,
+    error: streamsError,
+    isFetching: streamsFetching,
+  } = useQuery({
     queryKey: ["omss", backendUrl, type, tmdbId, season, episode],
     queryFn: ({ signal }) =>
       isTV
@@ -107,7 +90,6 @@ export default function WatchPage() {
     retry: 1,
     staleTime: 60 * 1000,
   });
-  const [fellBack, setFellBack] = useState(false);
 
   useEffect(() => {
     if (!movie) return;
@@ -127,30 +109,11 @@ export default function WatchPage() {
   }, [movie, season, episode, tmdbId, isTV]);
 
   const title = movie?.title || movie?.name || "Loading…";
-  const embedOptions = { sub: subtitle || undefined };
-  const embedUrl = isTV
-    ? provider.buildTVUrl(tmdbId, season, episode, embedOptions)
-    : provider.buildMovieUrl(tmdbId, embedOptions);
-
-  const handleProviderChange = (value: string) => {
-    setProviderId(value);
-    saveProviderId(value);
-    // An explicit choice ends the automatic fall back for this title; being
-    // moved off a source you just picked would be baffling.
-    setSourcePickedByHand(true);
-    setFellBack(false);
-  };
-
-  const handleSubtitleChange = (code: string) => {
-    setSubtitle(code);
-    saveSubtitle(code);
-  };
-
   const year = (movie?.release_date || movie?.first_air_date || "").slice(0, 4);
 
   const playableStreams = streams?.sources ?? [];
-  const useNativePlayer =
-    backendUrl.length > 0 && !nativeUnplayable && !streamsError && playableStreams.length > 0;
+  const hasBackend = backendUrl.length > 0;
+  const canPlay = hasBackend && !nativeUnplayable && !streamsFailed && playableStreams.length > 0;
 
   /**
    * Season summaries for the picker. TMDB lists empty and placeholder seasons,
@@ -185,111 +148,77 @@ export default function WatchPage() {
     setEpisode(nextEpisode);
   }, []);
 
-  // ── Handing the remote to the embed's own player ──────────────────────────
-
-  /**
-   * Focus moves *into* the iframe, so from that moment every key press belongs
-   * to the provider's player and this document sees none of them — that is what
-   * makes its controls usable with a D-pad, and it is also why there is no key
-   * we could listen for to get back out.
-   *
-   * Pushing a history entry first solves that: the remote's Back button pops it
-   * instead of leaving the page, and popstate is the signal to take focus back.
-   */
-  const leavePlayer = useCallback(() => {
-    setRemoteInPlayer(false);
-    window.focus();
-    // Put the remote back on the way in, so Back never dead-ends.
-    window.setTimeout(() => shieldRef.current?.focus(), 60);
-  }, []);
-
-  const enterPlayer = useCallback(() => {
-    const frame = iframeRef.current;
-    if (!frame) return;
-    // On device the hardware Back is delivered natively and claimed by the
-    // interceptor below, so no history entry is needed — pushing one would
-    // cost two presses to get out. In a browser there is no hardware Back, so
-    // an entry is what makes the browser's own Back an escape hatch.
-    if (!Capacitor.isNativePlatform()) {
-      window.history.pushState(
-        { ...(window.history.state as object | null), movwayPlayerFocus: true },
-        ""
-      );
-    }
-    frame.focus();
-    setRemoteInPlayer(true);
-  }, []);
-
-  /**
-   * While the embed holds the remote this document sees no keys at all, so
-   * Back is the only way out — and it must close the player rather than leave
-   * the page.
-   */
-  useEffect(() => {
-    if (!remoteInPlayer) return;
-    return registerBackInterceptor(() => {
-      leavePlayer();
-      return true;
-    });
-  }, [remoteInPlayer, leavePlayer]);
-
-  // Browser escape hatch, pairing with the pushState above.
-  useEffect(() => {
-    if (!remoteInPlayer || Capacitor.isNativePlatform()) return;
-    const onPopState = () => leavePlayer();
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, [remoteInPlayer, leavePlayer]);
-
-  // Changing stream while the remote is inside would strand it on a dead frame.
-  useEffect(() => {
-    setRemoteInPlayer(false);
-  }, [provider.id, subtitle, season, episode]);
-
   // A new title deserves a fresh attempt at the good path.
   useEffect(() => {
     setNativeUnplayable(null);
   }, [tmdbId, season, episode]);
 
   /**
-   * Fall back to the alternate source when the default never comes up.
+   * Why there is no picture, said plainly.
    *
-   * A cross-origin embed cannot be inspected, so "is it working" has to be
-   * inferred. VidLink is the one source that talks back — it posts playback
-   * telemetry to the page — so silence for long enough is the signal. That is
-   * a heuristic, not proof: it catches a source that fails to load or is
-   * blocked, which is the case worth catching, and it deliberately leaves a
-   * source alone once the viewer has chosen it themselves.
+   * There is no console on a television, so the difference between "no backend
+   * set", "the backend is unreachable" and "the backend had nothing for this
+   * title" has to be printed — they need completely different fixes, and every
+   * one of them used to render as the same silent switch to an embed.
    */
-  useEffect(() => {
-    const watching = shouldWatchForFailure({
-      providerId: provider.id,
-      defaultProviderId: DEFAULT_PROVIDER_ID,
-      pickedByHand: sourcePickedByHand,
-      alreadyFellBack: fellBack,
-    });
-    if (!watching) return;
-
-    let heard = false;
-    const onMessage = (event: MessageEvent) => {
-      if (event.source === iframeRef.current?.contentWindow) heard = true;
-    };
-    window.addEventListener("message", onMessage);
-
-    const timer = window.setTimeout(() => {
-      if (heard) return;
-      setFellBack(true);
-      // Deliberately not saved: the viewer's preference stays the default, so
-      // the next title tries it again rather than writing off the good source
-      // over one bad load.
-      setProviderId(FALLBACK_PROVIDER_ID);
-    }, FALLBACK_AFTER_MS);
-
-    return () => {
-      window.clearTimeout(timer);
-      window.removeEventListener("message", onMessage);
-    };
-  }, [provider.id, sourcePickedByHand, fellBack, season, episode, tmdbId]);
+  let notice: ReactNode = null;
+  if (!hasBackend) {
+    notice = (
+      <Placard kicker="No streaming backend">
+        <p>
+          Movway plays every title through its own player, which needs an OMSS backend to
+          supply the stream. Set one under Settings and this page will play it here.
+        </p>
+        <Link
+          to="/settings"
+          data-tv-autofocus
+          className="mt-3 inline-flex items-center border-2 border-border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-bone transition-colors hover:border-acid hover:bg-acid hover:text-ink focus-visible:border-acid focus-visible:bg-acid focus-visible:text-ink"
+        >
+          Open Settings
+        </Link>
+      </Placard>
+    );
+  } else if (streamsFailed) {
+    notice = (
+      <div className="flex aspect-video w-full items-center justify-center bg-ink px-4">
+        <FaultReport
+          title="Streaming backend"
+          error={streamsError}
+          describe={describeBackendFault}
+        />
+      </div>
+    );
+  } else if (streamsFetching && !streams) {
+    notice = (
+      <Placard kicker="Asking the backend">
+        <p>
+          Looking for a source for {title}. A backend that sleeps when idle can take up to a
+          minute to wake.
+        </p>
+      </Placard>
+    );
+  } else if (nativeUnplayable) {
+    notice = (
+      <Placard kicker="Nothing would play">
+        <p>
+          The backend returned {playableStreams.length}{" "}
+          {playableStreams.length === 1 ? "source" : "sources"}, and every one of them failed
+          to play.
+        </p>
+        <p className="mt-1.5 text-muted-foreground/60">{nativeUnplayable}</p>
+      </Placard>
+    );
+  } else {
+    notice = (
+      <Placard kicker="No source for this title">
+        <p>
+          The backend answered but offered nothing playable
+          {isTV ? ` for S${season}E${episode}` : ""}. Try another title to tell this apart
+          from a backend that is failing for everything.
+        </p>
+      </Placard>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -310,21 +239,15 @@ export default function WatchPage() {
             <span className="h-2 w-2 rounded-full bg-violet" />
           </span>
           <span className="kicker text-muted-foreground">
-            {useNativePlayer
-              ? "Now Playing"
-              : remoteInPlayer
-                ? "Remote in player"
-                : fellBack
-                  ? "Switched source"
-                  : "Now Playing"}
+            {canPlay ? "Now Playing" : "No stream"}
           </span>
           <span className="ml-auto truncate font-mono text-[10px] uppercase tracking-[0.14em] text-acid">
-            {useNativePlayer ? streams?.sources[0]?.provider?.name ?? "Direct" : provider.name}
+            {canPlay ? streams?.sources[0]?.provider?.name ?? "Direct" : "CinePro"}
             {isTV && ` · S${season}E${episode}`}
           </span>
         </div>
 
-        {useNativePlayer ? (
+        {canPlay ? (
           <NativePlayer
             sources={playableStreams}
             subtitles={streams?.subtitles ?? []}
@@ -334,100 +257,7 @@ export default function WatchPage() {
             onUnplayable={setNativeUnplayable}
           />
         ) : (
-        <div className="relative aspect-video w-full bg-ink">
-          {embedUrl ? (
-            <iframe
-              ref={iframeRef}
-              key={`${provider.id}-${subtitle}-${season}-${episode}`}
-              src={embedUrl}
-              className="absolute inset-0 h-full w-full border-0"
-              allowFullScreen
-              allow="autoplay; fullscreen; picture-in-picture; encrypted-media; clipboard-write"
-              referrerPolicy="origin"
-              title={title}
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center px-4 text-center">
-              <div>
-                <span className="kicker text-flare">Signal Lost</span>
-                <p className="mt-2 font-mono text-[11px] text-muted-foreground">
-                  Video playback is currently unavailable.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/*
-            TV only. A pointer can just click the player, but a D-pad needs one
-            deliberate way in — otherwise focus wanders into the frame while
-            passing by and the remote appears to freeze, since Back is then the
-            only way out. This is that door.
-          */}
-          {isTv && !remoteInPlayer && embedUrl && (
-            <button
-              ref={shieldRef}
-              type="button"
-              data-tv-autofocus
-              onClick={enterPlayer}
-              className="group absolute inset-0 flex items-end justify-center bg-transparent pb-[8%] transition-colors focus-visible:bg-ink/40"
-              aria-label="Use the player — hands the remote to the video controls"
-            >
-              <span className="flex items-center gap-2.5 border-2 border-transparent bg-ink/80 px-4 py-2.5 text-bone opacity-0 transition-all group-hover:opacity-100 group-focus-visible:border-acid group-focus-visible:bg-acid group-focus-visible:text-ink group-focus-visible:opacity-100">
-                <Play size={15} fill="currentColor" />
-                <span className="font-mono text-[11px] font-bold uppercase tracking-[0.18em]">
-                  Press OK to use the player
-                </span>
-              </span>
-            </button>
-          )}
-        </div>
-        )}
-
-        {remoteInPlayer && !useNativePlayer && (
-          <p className="border-t border-border bg-acid px-3 py-2 text-center font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-ink">
-            The remote is controlling {provider.name} — press Back to leave the player
-          </p>
-        )}
-      </div>
-
-      {/* ── Controls ── */}
-      <div className="flex flex-wrap items-center gap-2.5">
-        <Control label="Source">
-          <select
-            value={provider.id}
-            onChange={(e) => handleProviderChange(e.target.value)}
-            className={selectClass}
-          >
-            {VIDEO_PROVIDERS.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </Control>
-
-        <Control
-          label="Subs"
-          hint={provider.supportsSubtitles ? undefined : "This source doesn't support default subtitles"}
-        >
-          <select
-            value={subtitle}
-            onChange={(e) => handleSubtitleChange(e.target.value)}
-            disabled={!provider.supportsSubtitles}
-            className={selectClass}
-          >
-            {SUBTITLE_LANGUAGES.map((lang) => (
-              <option key={lang.code} value={lang.code}>
-                {lang.label}
-              </option>
-            ))}
-          </select>
-        </Control>
-
-        {!provider.supportsSubtitles && (
-          <span className="font-mono text-[10px] text-muted-foreground">
-            Use the player's own subtitle menu for this source.
-          </span>
+          notice
         )}
       </div>
 
