@@ -37,6 +37,24 @@ const vidlinkUrl = (base: string, opts: ProviderBuildOptions): string => {
 
 export const VIDEO_PROVIDERS: VideoProvider[] = [
   {
+    /**
+     * The default. It is the only source that reports playback back to the
+     * page (PLAYER_EVENT with currentTime/duration), which is what lets Movway
+     * tell whether it is actually working — and therefore what makes the
+     * automatic fall back to VidCore possible. Its player is themed to the app
+     * accent, since the embed's own controls are what the remote drives once
+     * focus moves into the frame. `startTime` is where
+     * `ProviderBuildOptions.startAt` lands.
+     */
+    id: "vidlink",
+    name: "VidLink",
+    supportsSubtitles: false,
+    buildMovieUrl: (id, opts = {}) => vidlinkUrl(`https://vidlink.pro/movie/${id}`, opts),
+    buildTVUrl: (id, season, episode, opts = {}) =>
+      vidlinkUrl(`https://vidlink.pro/tv/${id}/${season}/${episode}`, opts),
+  },
+  {
+    /** The alternate, used when VidLink does not come up. */
     id: "vidcore",
     name: "VidCore",
     supportsSubtitles: true,
@@ -51,69 +69,10 @@ export const VIDEO_PROVIDERS: VideoProvider[] = [
         startAt: opts.startAt,
       }),
   },
-  {
-    id: "vidsrc",
-    name: "VidSrc",
-    supportsSubtitles: false,
-    buildMovieUrl: (id) => `https://vidsrc.cc/v2/embed/movie/${id}?autoPlay=true`,
-    buildTVUrl: (id, season, episode) =>
-      `https://vidsrc.cc/v2/embed/tv/${id}/${season}/${episode}?autoPlay=true`,
-  },
-  {
-    // vsembed.ru — VidSrc mirror. TMDB ids; default subtitle language via ds_lang.
-    id: "vsembed",
-    name: "VSEmbed",
-    supportsSubtitles: true,
-    buildMovieUrl: (id, opts = {}) => {
-      const url = new URL(`https://vsembed.ru/embed/movie`);
-      url.searchParams.set("tmdb", String(id));
-      url.searchParams.set("autoplay", "1");
-      if (opts.sub) url.searchParams.set("ds_lang", opts.sub);
-      return url.toString();
-    },
-    buildTVUrl: (id, season, episode, opts = {}) => {
-      const url = new URL(`https://vsembed.ru/embed/tv`);
-      url.searchParams.set("tmdb", String(id));
-      url.searchParams.set("season", String(season));
-      url.searchParams.set("episode", String(episode));
-      url.searchParams.set("autoplay", "1");
-      url.searchParams.set("autonext", "1");
-      if (opts.sub) url.searchParams.set("ds_lang", opts.sub);
-      return url.toString();
-    },
-  },
-  {
-    /**
-     * Its player is themed to Movway's accent, since the embed's own controls
-     * are what the remote drives once focus moves into the frame. It also takes
-     * a `startTime` offset, which is what `ProviderBuildOptions.startAt` maps
-     * onto here.
-     */
-    id: "vidlink",
-    name: "VidLink",
-    supportsSubtitles: false,
-    buildMovieUrl: (id, opts = {}) =>
-      vidlinkUrl(`https://vidlink.pro/movie/${id}`, opts),
-    buildTVUrl: (id, season, episode, opts = {}) =>
-      vidlinkUrl(`https://vidlink.pro/tv/${id}/${season}/${episode}`, opts),
-  },
-  {
-    id: "embedsu",
-    name: "Embed.su",
-    supportsSubtitles: false,
-    buildMovieUrl: (id) => `https://embed.su/embed/movie/${id}`,
-    buildTVUrl: (id, season, episode) =>
-      `https://embed.su/embed/tv/${id}/${season}/${episode}`,
-  },
-  {
-    id: "autoembed",
-    name: "AutoEmbed",
-    supportsSubtitles: false,
-    buildMovieUrl: (id) => `https://player.autoembed.cc/embed/movie/${id}`,
-    buildTVUrl: (id, season, episode) =>
-      `https://player.autoembed.cc/embed/tv/${id}/${season}/${episode}`,
-  },
 ];
+
+/** Where playback falls back to when the default never comes up. */
+export const FALLBACK_PROVIDER_ID = "vidcore";
 
 export const DEFAULT_PROVIDER_ID = VIDEO_PROVIDERS[0].id;
 
@@ -147,7 +106,10 @@ const SUBTITLE_STORAGE_KEY = "movway:subtitle";
 
 export const loadProviderId = (): string => {
   if (typeof localStorage === "undefined") return DEFAULT_PROVIDER_ID;
-  return localStorage.getItem(PROVIDER_STORAGE_KEY) ?? DEFAULT_PROVIDER_ID;
+  const stored = localStorage.getItem(PROVIDER_STORAGE_KEY);
+  // A saved id can name a source that no longer exists — anyone who picked one
+  // of the sources since removed still has it in storage.
+  return VIDEO_PROVIDERS.some((p) => p.id === stored) ? (stored as string) : DEFAULT_PROVIDER_ID;
 };
 
 export const saveProviderId = (id: string) => {
