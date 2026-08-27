@@ -1,17 +1,42 @@
-import { buildMovieEmbedUrl, buildTVEpisodeEmbedUrl } from "@/lib/tmdb";
+/**
+ * Playback sources.
+ *
+ * VixSrc is the only one for now. What it supports was measured against the
+ * live player rather than taken from the docs, and those measurements are what
+ * the on-screen controls are built on:
+ *
+ *   • `startAt` genuinely seeks — a load with `startAt=120` landed at 125.9s.
+ *     That is what makes Movway's seek controls real rather than decorative.
+ *   • It posts `PLAYER_EVENT` telemetry outward (play / pause / seeked / ended /
+ *     timeupdate, with currentTime and duration), so the position and duration
+ *     shown are the player's own numbers, not an estimate.
+ *   • Its player answers the space bar, but arrow keys do nothing: two presses
+ *     while paused moved the position 0 seconds. And the handler lives in a
+ *     frame nested inside the page Movway embeds, so keys delivered to the
+ *     frame Movway owns do not reach it.
+ *
+ * That last point is why Movway draws its own controls instead of handing the
+ * remote over: the embed cannot be driven from outside, but it can be *told
+ * where to start*, and it reports where it is. Between those two facts a D-pad
+ * gets working play, pause and seek.
+ */
 
 export interface ProviderBuildOptions {
-  /** Default subtitle language code (e.g. "en", "es"). */
+  /** Preferred audio language (e.g. "en", "it"). */
   sub?: string;
-  /** Resume position in seconds. */
+  /** Start position in seconds — how seeking is performed. */
   startAt?: number;
 }
 
 export interface VideoProvider {
   id: string;
   name: string;
-  /** Whether the provider supports a default subtitle language via URL. */
+  /** Whether a language can be requested through the URL. */
   supportsSubtitles: boolean;
+  /** Whether the embed URL takes a start offset, which is how seeking works. */
+  supportsStartAt: boolean;
+  /** Origin its telemetry arrives from, for filtering `message` events. */
+  origin: string;
   buildMovieUrl: (tmdbId: number, opts?: ProviderBuildOptions) => string;
   buildTVUrl: (
     tmdbId: number,
@@ -21,58 +46,34 @@ export interface VideoProvider {
   ) => string;
 }
 
-/** Movway's marquee lime, so the embed's own controls match the app. */
-const VIDLINK_ACCENT = "CCFF00";
+/** Movway's marquee lime, so the embed's own chrome matches the app. */
+const ACCENT = "CCFF00";
+const ACCENT_SECONDARY = "1B1B20";
 
-const vidlinkUrl = (base: string, opts: ProviderBuildOptions): string => {
+const vixsrcUrl = (base: string, opts: ProviderBuildOptions): string => {
   const url = new URL(base);
   url.searchParams.set("autoplay", "true");
-  url.searchParams.set("primaryColor", VIDLINK_ACCENT);
-  url.searchParams.set("iconColor", VIDLINK_ACCENT);
+  url.searchParams.set("primaryColor", ACCENT);
+  url.searchParams.set("secondaryColor", ACCENT_SECONDARY);
+  if (opts.sub) url.searchParams.set("lang", opts.sub);
   if (opts.startAt && opts.startAt > 0) {
-    url.searchParams.set("startTime", String(Math.round(opts.startAt)));
+    url.searchParams.set("startAt", String(Math.round(opts.startAt)));
   }
   return url.toString();
 };
 
 export const VIDEO_PROVIDERS: VideoProvider[] = [
   {
-    /**
-     * The default. It is the only source that reports playback back to the
-     * page (PLAYER_EVENT with currentTime/duration), which is what lets Movway
-     * tell whether it is actually working — and therefore what makes the
-     * automatic fall back to VidCore possible. Its player is themed to the app
-     * accent, since the embed's own controls are what the remote drives once
-     * focus moves into the frame. `startTime` is where
-     * `ProviderBuildOptions.startAt` lands.
-     */
-    id: "vidlink",
-    name: "VidLink",
-    supportsSubtitles: false,
-    buildMovieUrl: (id, opts = {}) => vidlinkUrl(`https://vidlink.pro/movie/${id}`, opts),
-    buildTVUrl: (id, season, episode, opts = {}) =>
-      vidlinkUrl(`https://vidlink.pro/tv/${id}/${season}/${episode}`, opts),
-  },
-  {
-    /** The alternate, used when VidLink does not come up. */
-    id: "vidcore",
-    name: "VidCore",
+    id: "vixsrc",
+    name: "VixSrc",
     supportsSubtitles: true,
-    buildMovieUrl: (id, opts = {}) =>
-      buildMovieEmbedUrl(id, { autoPlay: true, sub: opts.sub, startAt: opts.startAt }),
+    supportsStartAt: true,
+    origin: "https://vixsrc.to",
+    buildMovieUrl: (id, opts = {}) => vixsrcUrl(`https://vixsrc.to/movie/${id}`, opts),
     buildTVUrl: (id, season, episode, opts = {}) =>
-      buildTVEpisodeEmbedUrl(id, season, episode, {
-        autoPlay: true,
-        nextButton: true,
-        autoNext: true,
-        sub: opts.sub,
-        startAt: opts.startAt,
-      }),
+      vixsrcUrl(`https://vixsrc.to/tv/${id}/${season}/${episode}`, opts),
   },
 ];
-
-/** Where playback falls back to when the default never comes up. */
-export const FALLBACK_PROVIDER_ID = "vidcore";
 
 export const DEFAULT_PROVIDER_ID = VIDEO_PROVIDERS[0].id;
 
@@ -84,21 +85,16 @@ export interface SubtitleLanguage {
   label: string;
 }
 
-/** "" = Off / player default. */
+/** "" = the player's own default. VixSrc calls this the audio `lang`. */
 export const SUBTITLE_LANGUAGES: SubtitleLanguage[] = [
-  { code: "", label: "Off" },
+  { code: "", label: "Default" },
   { code: "en", label: "English" },
+  { code: "it", label: "Italian" },
   { code: "es", label: "Spanish" },
   { code: "fr", label: "French" },
   { code: "de", label: "German" },
-  { code: "it", label: "Italian" },
   { code: "pt", label: "Portuguese" },
-  { code: "ar", label: "Arabic" },
-  { code: "hi", label: "Hindi" },
   { code: "ja", label: "Japanese" },
-  { code: "ko", label: "Korean" },
-  { code: "zh", label: "Chinese" },
-  { code: "ru", label: "Russian" },
 ];
 
 const PROVIDER_STORAGE_KEY = "movway:provider";
@@ -107,8 +103,7 @@ const SUBTITLE_STORAGE_KEY = "movway:subtitle";
 export const loadProviderId = (): string => {
   if (typeof localStorage === "undefined") return DEFAULT_PROVIDER_ID;
   const stored = localStorage.getItem(PROVIDER_STORAGE_KEY);
-  // A saved id can name a source that no longer exists — anyone who picked one
-  // of the sources since removed still has it in storage.
+  // A saved id can name a source that no longer exists.
   return VIDEO_PROVIDERS.some((p) => p.id === stored) ? (stored as string) : DEFAULT_PROVIDER_ID;
 };
 

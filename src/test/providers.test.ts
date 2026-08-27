@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   VIDEO_PROVIDERS,
   DEFAULT_PROVIDER_ID,
-  FALLBACK_PROVIDER_ID,
   getProvider,
   loadProviderId,
   saveProviderId,
@@ -11,73 +10,58 @@ import {
 beforeEach(() => window.localStorage.clear());
 
 describe("providers registry", () => {
-  it("offers exactly the two sources worth keeping", () => {
-    expect(VIDEO_PROVIDERS.map((p) => p.id)).toEqual(["vidlink", "vidcore"]);
+  it("offers VixSrc and nothing else", () => {
+    expect(VIDEO_PROVIDERS.map((p) => p.id)).toEqual(["vixsrc"]);
+    expect(DEFAULT_PROVIDER_ID).toBe("vixsrc");
   });
 
-  it("defaults to VidLink and falls back to VidCore", () => {
-    expect(DEFAULT_PROVIDER_ID).toBe("vidlink");
-    expect(FALLBACK_PROVIDER_ID).toBe("vidcore");
-    expect(getProvider(FALLBACK_PROVIDER_ID).name).toBe("VidCore");
+  it("declares the capabilities the controls are built on", () => {
+    const vixsrc = getProvider("vixsrc");
+    // Seeking is performed by reloading at an offset, so this flag is what
+    // makes the seek controls real rather than decorative.
+    expect(vixsrc.supportsStartAt).toBe(true);
+    expect(vixsrc.origin).toBe("https://vixsrc.to");
   });
 
   it("falls back to the default for an unknown id", () => {
     expect(getProvider("does-not-exist").id).toBe(DEFAULT_PROVIDER_ID);
   });
-});
 
-describe("remembering a source", () => {
-  it("returns the default when nothing is stored", () => {
+  it("ignores a stored source that has since been removed", () => {
+    window.localStorage.setItem("movway:provider", "vidlink");
     expect(loadProviderId()).toBe(DEFAULT_PROVIDER_ID);
   });
 
-  it("returns a stored source that still exists", () => {
-    saveProviderId("vidcore");
-    expect(loadProviderId()).toBe("vidcore");
-  });
-
-  it("ignores a source that has since been removed", () => {
-    // Anyone who picked one of the sources dropped in v1.4.2 still has its id
-    // in storage; honouring it would leave them on a source that is gone.
-    window.localStorage.setItem("movway:provider", "vsembed");
-    expect(loadProviderId()).toBe(DEFAULT_PROVIDER_ID);
+  it("remembers a source that still exists", () => {
+    saveProviderId("vixsrc");
+    expect(loadProviderId()).toBe("vixsrc");
   });
 });
 
-describe("vidlink urls", () => {
-  const vidlink = getProvider("vidlink");
+describe("vixsrc urls", () => {
+  const vixsrc = getProvider("vixsrc");
 
-  it("builds a movie url with autoplay and the app accent", () => {
-    const url = new URL(vidlink.buildMovieUrl(603));
-    expect(url.origin + url.pathname).toBe("https://vidlink.pro/movie/603");
+  it("builds a movie url themed to the app accent", () => {
+    const url = new URL(vixsrc.buildMovieUrl(603));
+    expect(url.origin + url.pathname).toBe("https://vixsrc.to/movie/603");
     expect(url.searchParams.get("autoplay")).toBe("true");
     expect(url.searchParams.get("primaryColor")).toBe("CCFF00");
-    expect(url.searchParams.get("startTime")).toBeNull();
+    expect(url.searchParams.get("startAt")).toBeNull();
   });
 
-  it("seeks by start offset", () => {
-    const url = new URL(vidlink.buildMovieUrl(603, { startAt: 125.6 }));
-    expect(url.searchParams.get("startTime")).toBe("126");
+  it("seeks by start offset, rounded to whole seconds", () => {
+    const url = new URL(vixsrc.buildMovieUrl(603, { startAt: 125.6 }));
+    expect(url.searchParams.get("startAt")).toBe("126");
   });
 
-  it("builds a tv episode url", () => {
-    const url = new URL(vidlink.buildTVUrl(1399, 2, 5));
-    expect(url.origin + url.pathname).toBe("https://vidlink.pro/tv/1399/2/5");
-  });
-});
-
-describe("vidcore urls", () => {
-  const vidcore = getProvider("vidcore");
-
-  it("carries the subtitle language it supports", () => {
-    expect(vidcore.supportsSubtitles).toBe(true);
-    const url = new URL(vidcore.buildMovieUrl(603, { sub: "es" }));
-    expect(url.searchParams.get("sub")).toBe("es");
+  it("omits the offset at the start of a title", () => {
+    const url = new URL(vixsrc.buildMovieUrl(603, { startAt: 0 }));
+    expect(url.searchParams.get("startAt")).toBeNull();
   });
 
-  it("builds a tv episode url with autonext", () => {
-    const url = new URL(vidcore.buildTVUrl(1399, 2, 5));
-    expect(url.pathname).toContain("/tv/1399/2/5");
-    expect(url.searchParams.get("autoNext")).toBe("true");
+  it("builds a tv episode url and carries the language", () => {
+    const url = new URL(vixsrc.buildTVUrl(1399, 2, 5, { sub: "en" }));
+    expect(url.origin + url.pathname).toBe("https://vixsrc.to/tv/1399/2/5");
+    expect(url.searchParams.get("lang")).toBe("en");
   });
 });

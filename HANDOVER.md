@@ -3,7 +3,7 @@
 Everything a fresh session needs to pick this up: what the app is, what was built,
 what was proven impossible and why, and the one task waiting at the front of the queue.
 
-**State:** v1.5.1 · versionCode 14 · 77 tests passing · `main` @ c217628
+**State:** v1.6.0 · versionCode 15 · 77 tests passing
 
 ---
 
@@ -32,52 +32,55 @@ shouldn't be re-litigated without reason.
 | D-pad navigation | **works** | Geometric focus walker with zones. Focus lands on the player on arrival. |
 | Back button | **works** | Steps back through the app; exits only from the first screen. |
 | Native player | **needs a backend** | Movway's own `<video>` + hls.js with working controls. Active only when a streaming backend is configured. |
-| Embedded players | **picture only** | VidLink (default) and VidCore in an iframe, with automatic fallback. No playback control is possible — see §3. |
+| Embedded player | **works** | VixSrc is the only source. Movway draws its own controls over it: real position, working play/pause and seek — see §3. |
 | Streaming backend | **next up** | Needs a CinePro Core instance on an **https** address. The one outstanding task. |
 
 ---
 
-## 3. Why there are two playback paths
+## 3. How playback is controlled
 
-The app originally played everything by embedding a third-party player in an `<iframe>`.
-On a TV that fails at the most basic level: **you cannot pause with the remote.** Four
-rounds went into trying to fix that inside the iframe before establishing it cannot be
-fixed there at all.
+VixSrc is the only source. What it supports was **measured against the live player**, not
+taken from its docs — and the docs were wrong in one place that mattered.
 
-These are measured results, not assumptions. Re-testing them is wasted effort unless a
-provider changes.
+| Capability | Result |
+|---|---|
+| `startAt` seeking | **works** — a load with `startAt=120` landed at 125.9s |
+| `PLAYER_EVENT` telemetry | **works** — real currentTime and duration arrive |
+| Space toggles play/pause in their player | **works** |
+| Arrow keys seek in their player | **no** — 0 delta across two presses while paused |
+| Keys sent to the frame Movway embeds | **do not reach the player** — the handler lives in a frame nested inside it |
 
-**REFUTED — the embed will accept play/pause commands.**
-All five common postMessage dialects were sent to VidLink. Playback carried on unchanged
-and it emitted no `pause` event. These players broadcast telemetry outward but accept
-nothing inward.
+**The docs describe the telemetry payload under `data`. It actually arrives under `event`:**
 
-**REFUTED — focusing the iframe will let the D-pad drive their player.**
-Space and ArrowRight were dispatched at the embed's document, body and `<video>` element.
-Neither playback state nor position moved: their player has no keyboard handling, so focus
-delivery is irrelevant.
+```
+{ type: "PLAYER_EVENT", event: { event: "timeupdate", currentTime: 40, duration: 8175.7 } }
+```
 
-**REFUTED — the video can be mirrored into our own element.**
-A cross-origin iframe cannot be drawn to a canvas, and `captureStream()` needs same-origin
-access. CSS cropping can't help because their controls are painted over the video. None of
-it would give control regardless.
+Parsing the documented shape silently produced a dead scrub bar. `parseTelemetry` in
+`src/lib/embedBridge.ts` accepts both.
 
-**OUT OF BOUNDS — resolve the stream URL ourselves.**
-The manifest is reachable but gated by a per-request token minted by a WebAssembly module
-(`fu.wasm`) plus CloudFront signed cookies with an expiry. Getting at it means defeating a
-deliberate access-control mechanism, so it was not built.
+Because keys cannot reach their player, Movway does not hand the remote over. It draws its
+own controls and drives the embed through the two channels that do work:
 
-**CONFIRMED — a streaming backend returns the stream, and then everything works.**
-With an OMSS backend, Movway plays the stream in its own `<video>`. Verified live: pause
-took playback `false → true`, forward-a-minute moved `8.5s → 68.5s`, and the scrub bar
-landed on exactly `300s` of a 635s title.
+- **Position and duration** come from their telemetry, so the clock and scrub bar show real
+  numbers. A `~` prefix marks the brief window before the player reports in.
+- **Seeking** reloads the frame at a new `startAt`.
+- **Play/pause** tears the frame down — the only thing that reliably stops a player that
+  ignores commands — and puts it back at the captured offset.
 
-So: **the embed path gives a picture and nothing else.** Its on-screen chrome can change
-source, change episode and go fullscreen, but not pause. The backend path is the only
-arrangement where a remote controls playback, and it is already built and tested — it just
-needs a backend to point at.
+Verified end to end against the live embed: pause removed the frame, resume returned it at
+`startAt=8`, forward-a-minute moved `startAt` 8 → 91, and the scrub bar carried the real
+duration of 8176s.
 
----
+Their own chrome stays visible underneath, because a cross-origin frame's UI cannot be
+removed. Nothing on screen depends on it.
+
+### The other path: a streaming backend
+
+`src/lib/omss.ts` and `src/components/NativePlayer.tsx` still exist and are dormant. If a
+CinePro Core address is set in Settings, Movway plays the stream in its own `<video>` with
+hls.js instead of embedding anything, which is strictly better — every control is a plain
+operation on an element the app owns. See §4.
 
 ## 4. The one task outstanding
 
@@ -196,6 +199,13 @@ and Deno edge functions, not a long-running Node server.
 - **Node 22 shadows jsdom's localStorage.** Node defines a global `localStorage` that needs
   a launch flag, so storage throws under test while working in a browser.
   `src/test/setup.ts` installs an in-memory one.
+
+- **`npx tsc --noEmit` checks nothing.** `tsconfig.json` has `"files": []` and only project
+  references, so that command silently passes with real type errors present. It hid three.
+  Use `npm run typecheck` (`tsc -b --noEmit`), which is now a script.
+
+- **A provider's docs are not its behaviour.** VixSrc's telemetry shape differs from what it
+  publishes. Measure against the live player before building on a documented contract.
 
 - **TMDB needs native HTTP on device.** Cross-origin fetches from `https://localhost` fail
   in the packaged WebView. TMDB requests go through the platform's HTTP stack on Android and

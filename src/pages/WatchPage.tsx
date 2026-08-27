@@ -13,22 +13,18 @@ import {
   VIDEO_PROVIDERS,
   SUBTITLE_LANGUAGES,
   getProvider,
-  DEFAULT_PROVIDER_ID,
-  FALLBACK_PROVIDER_ID,
   loadProviderId,
   saveProviderId,
   loadSubtitle,
   saveSubtitle,
 } from "@/lib/providers";
 import { upsertWatchEntry } from "@/lib/continueWatching";
-import { isTvDevice } from "@/lib/tv";
 import NativePlayer from "@/components/NativePlayer";
 import { fetchEpisodeSources, fetchMovieSources, loadBackendUrl } from "@/lib/omss";
-import { FALLBACK_AFTER_MS, shouldWatchForFailure } from "@/lib/sourceFallback";
-import { registerBackInterceptor } from "@/lib/backHandler";
-import { Capacitor } from "@capacitor/core";
 import EpisodePicker from "@/components/EpisodePicker";
-import { ArrowLeft, Play, Star } from "lucide-react";
+import EmbedPlayer from "@/components/EmbedPlayer";
+import { useEmbedPlayback } from "@/hooks/useEmbedPlayback";
+import { ArrowLeft, Star } from "lucide-react";
 import { useState, useEffect, useMemo, useRef, useCallback, ReactNode } from "react";
 
 /** A bordered control slab — the only form idiom in this UI. */
@@ -83,10 +79,15 @@ export default function WatchPage() {
   const provider = getProvider(providerId);
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const shieldRef = useRef<HTMLButtonElement>(null);
-  const [isTv] = useState(() => isTvDevice());
-  const [remoteInPlayer, setRemoteInPlayer] = useState(false);
-  const [sourcePickedByHand, setSourcePickedByHand] = useState(false);
+
+  /**
+   * Playing the embed is done through its URL, because that is the only
+   * channel it answers to. Pausing tears the frame down, which genuinely stops
+   * playback; resuming puts it back at the offset it was torn down on.
+   */
+  const [paused, setPaused] = useState(false);
+  const [startAt, setStartAt] = useState(0);
+  const [reloadNonce, setReloadNonce] = useState(0);
 
   /**
    * A configured OMSS backend replaces the embed with a stream Movway plays
@@ -107,7 +108,6 @@ export default function WatchPage() {
     retry: 1,
     staleTime: 60 * 1000,
   });
-  const [fellBack, setFellBack] = useState(false);
 
   useEffect(() => {
     if (!movie) return;
@@ -127,18 +127,19 @@ export default function WatchPage() {
   }, [movie, season, episode, tmdbId, isTV]);
 
   const title = movie?.title || movie?.name || "Loading…";
-  const embedOptions = { sub: subtitle || undefined };
-  const embedUrl = isTV
-    ? provider.buildTVUrl(tmdbId, season, episode, embedOptions)
-    : provider.buildMovieUrl(tmdbId, embedOptions);
+  const embedOptions = {
+    sub: subtitle || undefined,
+    startAt: startAt > 0 ? startAt : undefined,
+  };
+  const embedUrl = paused
+    ? ""
+    : isTV
+      ? provider.buildTVUrl(tmdbId, season, episode, embedOptions)
+      : provider.buildMovieUrl(tmdbId, embedOptions);
 
   const handleProviderChange = (value: string) => {
     setProviderId(value);
     saveProviderId(value);
-    // An explicit choice ends the automatic fall back for this title; being
-    // moved off a source you just picked would be baffling.
-    setSourcePickedByHand(true);
-    setFellBack(false);
   };
 
   const handleSubtitleChange = (code: string) => {
@@ -185,111 +186,69 @@ export default function WatchPage() {
     setEpisode(nextEpisode);
   }, []);
 
-  // ── Handing the remote to the embed's own player ──────────────────────────
+  // ── Playback control ────────────────────────────────────────────────────
+
+  /** Anything here changes the loaded stream, so the position tracker resets. */
+  const resetKey = `${provider.id}|${subtitle}|${season}|${episode}|${startAt}|${reloadNonce}`;
+
+  const playback = useEmbedPlayback({
+    iframeRef,
+    origin: provider.origin,
+    resetKey,
+    baseline: startAt,
+    paused,
+  });
 
   /**
-   * Focus moves *into* the iframe, so from that moment every key press belongs
-   * to the provider's player and this document sees none of them — that is what
-   * makes its controls usable with a D-pad, and it is also why there is no key
-   * we could listen for to get back out.
-   *
-   * Pushing a history entry first solves that: the remote's Back button pops it
-   * instead of leaving the page, and popstate is the signal to take focus back.
+   * Pausing unloads the frame, which is the only thing that reliably stops a
+   * player that ignores commands. Resuming reloads it at the position it was
+   * stopped on, which the provider's `startAt` makes exact.
    */
-  const leavePlayer = useCallback(() => {
-    setRemoteInPlayer(false);
-    window.focus();
-    // Put the remote back on the way in, so Back never dead-ends.
-    window.setTimeout(() => shieldRef.current?.focus(), 60);
-  }, []);
-
-  const enterPlayer = useCallback(() => {
-    const frame = iframeRef.current;
-    if (!frame) return;
-    // On device the hardware Back is delivered natively and claimed by the
-    // interceptor below, so no history entry is needed — pushing one would
-    // cost two presses to get out. In a browser there is no hardware Back, so
-    // an entry is what makes the browser's own Back an escape hatch.
-    if (!Capacitor.isNativePlatform()) {
-      window.history.pushState(
-        { ...(window.history.state as object | null), movwayPlayerFocus: true },
-        ""
-      );
-    }
-    frame.focus();
-    setRemoteInPlayer(true);
-  }, []);
-
-  /**
-   * While the embed holds the remote this document sees no keys at all, so
-   * Back is the only way out — and it must close the player rather than leave
-   * the page.
-   */
-  useEffect(() => {
-    if (!remoteInPlayer) return;
-    return registerBackInterceptor(() => {
-      leavePlayer();
+  const togglePlay = useCallback(() => {
+    setPaused((wasPaused) => {
+      if (wasPaused) {
+        setReloadNonce((n) => n + 1);
+        return false;
+      }
+      setStartAt(Math.max(0, Math.round(playback.position)));
       return true;
     });
-  }, [remoteInPlayer, leavePlayer]);
+  }, [playback.position]);
 
-  // Browser escape hatch, pairing with the pushState above.
-  useEffect(() => {
-    if (!remoteInPlayer || Capacitor.isNativePlatform()) return;
-    const onPopState = () => leavePlayer();
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, [remoteInPlayer, leavePlayer]);
+  const seekTo = useCallback((seconds: number) => {
+    setStartAt(Math.max(0, Math.round(seconds)));
+    setPaused(false);
+    setReloadNonce((n) => n + 1);
+  }, []);
 
-  // Changing stream while the remote is inside would strand it on a dead frame.
+  const seekBy = useCallback(
+    (delta: number) => seekTo(playback.position + delta),
+    [seekTo, playback.position]
+  );
+
+  const restart = useCallback(() => seekTo(0), [seekTo]);
+
+  const cycleLanguage = useCallback(() => {
+    const at = SUBTITLE_LANGUAGES.findIndex((l) => l.code === subtitle);
+    handleSubtitleChange(SUBTITLE_LANGUAGES[(at + 1) % SUBTITLE_LANGUAGES.length].code);
+    setStartAt(Math.max(0, Math.round(playback.position)));
+  }, [subtitle, playback.position]);
+
+  const languageLabel =
+    SUBTITLE_LANGUAGES.find((l) => l.code === subtitle)?.label ?? "Default";
+
+  // A different title starts from the beginning, playing.
   useEffect(() => {
-    setRemoteInPlayer(false);
-  }, [provider.id, subtitle, season, episode]);
+    setStartAt(0);
+    setPaused(false);
+  }, [tmdbId, season, episode]);
 
   // A new title deserves a fresh attempt at the good path.
   useEffect(() => {
     setNativeUnplayable(null);
   }, [tmdbId, season, episode]);
 
-  /**
-   * Fall back to the alternate source when the default never comes up.
-   *
-   * A cross-origin embed cannot be inspected, so "is it working" has to be
-   * inferred. VidLink is the one source that talks back — it posts playback
-   * telemetry to the page — so silence for long enough is the signal. That is
-   * a heuristic, not proof: it catches a source that fails to load or is
-   * blocked, which is the case worth catching, and it deliberately leaves a
-   * source alone once the viewer has chosen it themselves.
-   */
-  useEffect(() => {
-    const watching = shouldWatchForFailure({
-      providerId: provider.id,
-      defaultProviderId: DEFAULT_PROVIDER_ID,
-      pickedByHand: sourcePickedByHand,
-      alreadyFellBack: fellBack,
-    });
-    if (!watching) return;
 
-    let heard = false;
-    const onMessage = (event: MessageEvent) => {
-      if (event.source === iframeRef.current?.contentWindow) heard = true;
-    };
-    window.addEventListener("message", onMessage);
-
-    const timer = window.setTimeout(() => {
-      if (heard) return;
-      setFellBack(true);
-      // Deliberately not saved: the viewer's preference stays the default, so
-      // the next title tries it again rather than writing off the good source
-      // over one bad load.
-      setProviderId(FALLBACK_PROVIDER_ID);
-    }, FALLBACK_AFTER_MS);
-
-    return () => {
-      window.clearTimeout(timer);
-      window.removeEventListener("message", onMessage);
-    };
-  }, [provider.id, sourcePickedByHand, fellBack, season, episode, tmdbId]);
 
   return (
     <div className="space-y-8">
@@ -310,13 +269,7 @@ export default function WatchPage() {
             <span className="h-2 w-2 rounded-full bg-violet" />
           </span>
           <span className="kicker text-muted-foreground">
-            {useNativePlayer
-              ? "Now Playing"
-              : remoteInPlayer
-                ? "Remote in player"
-                : fellBack
-                  ? "Switched source"
-                  : "Now Playing"}
+            {paused ? "Paused" : "Now Playing"}
           </span>
           <span className="ml-auto truncate font-mono text-[10px] uppercase tracking-[0.14em] text-acid">
             {useNativePlayer ? streams?.sources[0]?.provider?.name ?? "Direct" : provider.name}
@@ -334,59 +287,25 @@ export default function WatchPage() {
             onUnplayable={setNativeUnplayable}
           />
         ) : (
-        <div className="relative aspect-video w-full bg-ink">
-          {embedUrl ? (
-            <iframe
-              ref={iframeRef}
-              key={`${provider.id}-${subtitle}-${season}-${episode}`}
-              src={embedUrl}
-              className="absolute inset-0 h-full w-full border-0"
-              allowFullScreen
-              allow="autoplay; fullscreen; picture-in-picture; encrypted-media; clipboard-write"
-              referrerPolicy="origin"
-              title={title}
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center px-4 text-center">
-              <div>
-                <span className="kicker text-flare">Signal Lost</span>
-                <p className="mt-2 font-mono text-[11px] text-muted-foreground">
-                  Video playback is currently unavailable.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/*
-            TV only. A pointer can just click the player, but a D-pad needs one
-            deliberate way in — otherwise focus wanders into the frame while
-            passing by and the remote appears to freeze, since Back is then the
-            only way out. This is that door.
-          */}
-          {isTv && !remoteInPlayer && embedUrl && (
-            <button
-              ref={shieldRef}
-              type="button"
-              data-tv-autofocus
-              onClick={enterPlayer}
-              className="group absolute inset-0 flex items-end justify-center bg-transparent pb-[8%] transition-colors focus-visible:bg-ink/40"
-              aria-label="Use the player — hands the remote to the video controls"
-            >
-              <span className="flex items-center gap-2.5 border-2 border-transparent bg-ink/80 px-4 py-2.5 text-bone opacity-0 transition-all group-hover:opacity-100 group-focus-visible:border-acid group-focus-visible:bg-acid group-focus-visible:text-ink group-focus-visible:opacity-100">
-                <Play size={15} fill="currentColor" />
-                <span className="font-mono text-[11px] font-bold uppercase tracking-[0.18em]">
-                  Press OK to use the player
-                </span>
-              </span>
-            </button>
-          )}
-        </div>
-        )}
-
-        {remoteInPlayer && !useNativePlayer && (
-          <p className="border-t border-border bg-acid px-3 py-2 text-center font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-ink">
-            The remote is controlling {provider.name} — press Back to leave the player
-          </p>
+          <EmbedPlayer
+            embedUrl={embedUrl}
+            frameKey={resetKey}
+            title={title}
+            iframeRef={iframeRef}
+            provider={provider}
+            playback={playback}
+            paused={paused}
+            onTogglePlay={togglePlay}
+            onSeekTo={seekTo}
+            onSeekBy={seekBy}
+            onRestart={restart}
+            onPrevEpisode={
+              isTV && episode > 1 ? () => selectEpisode(season, episode - 1) : undefined
+            }
+            onNextEpisode={isTV ? () => selectEpisode(season, episode + 1) : undefined}
+            languageLabel={languageLabel}
+            onCycleLanguage={cycleLanguage}
+          />
         )}
       </div>
 
