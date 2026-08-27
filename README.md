@@ -40,10 +40,21 @@ hls.js, so play, pause, seek, subtitles and volume are ordinary operations on an
 element the app owns. This is the only arrangement where a remote can drive
 playback.
 
-The backend runs on your own machine or home server, needs a TMDB key, and must
-be reachable from the TV. Every URL it returns is a path onto its own proxy, so
-upstream headers and CORS are its problem rather than the app's. CinePro Core is
-licensed for personal use.
+The backend needs a TMDB key and must be reachable from the TV **over https**:
+the Android build serves itself from `https://localhost` with mixed content
+disabled, so a plain `http://` address is blocked by the WebView before a
+request is made. It works in a desktop browser, which is how that trap stays
+hidden during development — Settings warns when an address will not work on the
+TV.
+
+CinePro Core ships a Render blueprint (`render.yaml`), which is the easiest way
+to get an https URL; a home server works too behind a TLS reverse proxy. Note
+that Render's free plan sleeps after inactivity, so the first play after a
+break waits on a cold start. Set `PUBLIC_URL` to the deployed URL. CinePro Core
+is licensed for personal use.
+
+Every URL it returns is a path onto its own proxy, so upstream headers and CORS
+are its problem rather than the app's.
 
 `src/lib/omss.ts` is the client; `src/components/NativePlayer.tsx` is the player.
 Sources are ranked so a playable type and the highest resolution come first, and

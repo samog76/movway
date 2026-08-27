@@ -5,6 +5,7 @@ import {
   saveBackendUrl,
   resolveUrl,
   rankSources,
+  isReachableFromPackagedApp,
   movieSourcesUrl,
   episodeSourcesUrl,
   fetchMovieSources,
@@ -119,5 +120,28 @@ describe("fetching sources", () => {
     const out = await fetchMovieSources("http://nas.local:3000", 603);
     expect(out.sources).toEqual([]);
     expect(out.subtitles).toEqual([]);
+  });
+});
+
+describe("addresses the packaged app can actually reach", () => {
+  it("accepts https", () => {
+    expect(isReachableFromPackagedApp("https://cinepro-core.onrender.com")).toBe(true);
+  });
+
+  it("rejects a plain http host, which the TV build blocks as mixed content", () => {
+    // The app serves itself from https://localhost with mixed content off, so
+    // this fails before a request is made — and works fine in a desktop
+    // browser, which is how it stays hidden during development.
+    expect(isReachableFromPackagedApp("http://192.168.1.10:3000")).toBe(false);
+    expect(isReachableFromPackagedApp("192.168.1.10:3000")).toBe(false);
+  });
+
+  it("allows http on localhost, where the platform makes an exception", () => {
+    expect(isReachableFromPackagedApp("http://localhost:3000")).toBe(true);
+    expect(isReachableFromPackagedApp("http://127.0.0.1:3000")).toBe(true);
+  });
+
+  it("treats no address as nothing to reach", () => {
+    expect(isReachableFromPackagedApp("")).toBe(false);
   });
 });

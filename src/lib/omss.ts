@@ -55,6 +55,21 @@ export function normaliseBackendUrl(raw: string): string {
   return /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
 }
 
+/**
+ * Whether this address will actually work in the packaged app.
+ *
+ * The Android build serves the app from https://localhost with mixed content
+ * disabled (capacitor.config.ts), so a plain http backend is blocked by the
+ * WebView before a request is ever made — the screen simply stays empty. A
+ * browser on a desktop has no such objection, which is exactly how this hides
+ * during development.
+ */
+export function isReachableFromPackagedApp(url: string): boolean {
+  const value = normaliseBackendUrl(url);
+  if (!value) return false;
+  return /^https:\/\//i.test(value) || /^https?:\/\/(localhost|127\.0\.0\.1)(:|$)/i.test(value);
+}
+
 export function loadBackendUrl(): string {
   if (typeof localStorage === "undefined") return "";
   return localStorage.getItem(BACKEND_KEY) ?? "";

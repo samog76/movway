@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
-import { checkBackend, loadBackendUrl, normaliseBackendUrl, saveBackendUrl } from "@/lib/omss";
+import {
+  checkBackend,
+  isReachableFromPackagedApp,
+  loadBackendUrl,
+  normaliseBackendUrl,
+  saveBackendUrl,
+} from "@/lib/omss";
 import { describeFault } from "@/lib/faults";
 
 type Check =
@@ -60,7 +66,7 @@ export default function SettingsPage() {
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="http://192.168.1.10:3000"
+            placeholder="https://cinepro-core.onrender.com"
             spellCheck={false}
             autoCapitalize="none"
             className="min-w-0 flex-1 bg-card px-3 py-2.5 font-mono text-xs text-bone placeholder:text-muted-foreground/60 focus:outline-none"
@@ -85,6 +91,14 @@ export default function SettingsPage() {
           {saved && <span className="kicker text-acid">Saved</span>}
         </div>
 
+        {value.trim().length > 0 && !isReachableFromPackagedApp(value) && (
+          <p className="border border-flare/40 bg-flare/5 px-3 py-2 font-mono text-[10px] leading-relaxed text-flare">
+            This works in a browser but not in the TV app: it serves itself over https, and an
+            http address is blocked before the request is made. Host the backend behind https —
+            a Render deploy gives you one.
+          </p>
+        )}
+
         {check.state === "checking" && (
           <p className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Contacting {normaliseBackendUrl(value)}…
@@ -102,8 +116,9 @@ export default function SettingsPage() {
         )}
 
         <p className="border-t border-border pt-3 font-mono text-[10px] leading-relaxed text-muted-foreground/70">
-          The backend runs on your own machine or home server — see docs.cinepro.cc. It must be
-          reachable from this device, and CinePro Core is licensed for personal use only.
+          Runs on your own machine, home server or a host like Render — see docs.cinepro.cc. It
+          must be reachable from this device over https, and CinePro Core is licensed for
+          personal use only.
         </p>
       </section>
     </div>
