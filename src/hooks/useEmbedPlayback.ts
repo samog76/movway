@@ -7,6 +7,13 @@ interface Options {
   origin: string;
   /** Changes whenever the stream reloads (episode, language, seek). */
   resetKey: string;
+  /**
+   * Changes only when the actual title changes. Reloading the *same* title —
+   * which is what pausing and seeking do — keeps what is already known about
+   * it, so the scrub bar and duration stay put instead of emptying and
+   * refilling. That blanking is what made resuming look like starting over.
+   */
+  titleKey: string;
   /** Offset this load started at. */
   baseline: number;
   /** True while the stream is torn down, which is how pausing works. */
@@ -21,14 +28,31 @@ interface Options {
  * the first seconds rather than sitting at zero — and the difference is shown
  * on screen rather than hidden, since one is fact and the other is an estimate.
  */
-export function useEmbedPlayback({ iframeRef, origin, resetKey, baseline, paused }: Options) {
+export function useEmbedPlayback({
+  iframeRef,
+  origin,
+  resetKey,
+  titleKey,
+  baseline,
+  paused,
+}: Options) {
   const [playback, setPlayback] = useState<Playback>(emptyPlayback);
   const reportedRef = useRef(false);
 
-  // A fresh load starts a fresh estimate.
+  // A different title knows nothing yet.
   useEffect(() => {
     reportedRef.current = false;
-    setPlayback({ ...emptyPlayback(), position: baseline });
+    setPlayback(emptyPlayback());
+  }, [titleKey]);
+
+  /**
+   * The same title reloading — a pause, a resume, a seek — keeps its duration
+   * and simply moves to the new offset. Only the position is provisional again,
+   * until the player reports in.
+   */
+  useEffect(() => {
+    reportedRef.current = false;
+    setPlayback((prev) => ({ ...prev, position: baseline, reported: false }));
     // baseline moves together with resetKey; reacting to it alone would rewind
     // the clock mid-play.
     // eslint-disable-next-line react-hooks/exhaustive-deps

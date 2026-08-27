@@ -195,6 +195,7 @@ export default function WatchPage() {
     iframeRef,
     origin: provider.origin,
     resetKey,
+    titleKey: `${type}|${tmdbId}|${season}|${episode}`,
     baseline: startAt,
     paused,
   });

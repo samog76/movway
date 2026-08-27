@@ -3,7 +3,7 @@
 Everything a fresh session needs to pick this up: what the app is, what was built,
 what was proven impossible and why, and the one task waiting at the front of the queue.
 
-**State:** v1.6.0 · versionCode 15 · 77 tests passing
+**State:** v1.6.1 · versionCode 16 · 77 tests passing
 
 ---
 
@@ -50,6 +50,11 @@ taken from its docs — and the docs were wrong in one place that mattered.
 | Arrow keys seek in their player | **no** — 0 delta across two presses while paused |
 | Keys sent to the frame Movway embeds | **do not reach the player** — the handler lives in a frame nested inside it |
 
+This last row was re-tested with a **real** key press rather than a synthetic DOM
+dispatch (the browser's own input pipeline, with focus genuinely on the iframe). Playback
+did not pause and the position kept advancing 13→14→15→16→17. Handing the remote to the
+embed therefore cannot work, and pausing must unload the frame.
+
 **The docs describe the telemetry payload under `data`. It actually arrives under `event`:**
 
 ```
@@ -71,6 +76,12 @@ own controls and drives the embed through the two channels that do work:
 Verified end to end against the live embed: pause removed the frame, resume returned it at
 `startAt=8`, forward-a-minute moved `startAt` 8 → 91, and the scrub bar carried the real
 duration of 8176s.
+
+Resuming reloads the provider's page — unavoidable, since unloading is the only thing that
+stops it. What is avoidable is *looking* like a restart, so the known duration and position
+survive a same-title reload (the scrub bar keeps its range rather than collapsing to empty)
+and a "Resuming at 00:20" notice covers the wait. That notice ends when the player reports
+in, capped at six seconds so a silent provider never leaves it sitting over playing film.
 
 Their own chrome stays visible underneath, because a cross-origin frame's UI cannot be
 removed. Nothing on screen depends on it.

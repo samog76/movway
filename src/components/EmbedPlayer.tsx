@@ -11,6 +11,7 @@ import {
   SkipBack,
   SkipForward,
 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { formatTime, type Playback } from "@/lib/embedBridge";
 import type { VideoProvider } from "@/lib/providers";
 
@@ -96,6 +97,26 @@ export default function EmbedPlayer({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [idle, setIdle] = useState(false);
 
+  /**
+   * Resuming and seeking both reload the frame, and a blank frame with an
+   * empty scrub bar reads as "the film started over". Saying where it is going
+   * makes the wait legible instead.
+   *
+   * The wait ends when the player reports in — not on the iframe's load event,
+   * which fires when the provider's shell arrives, well before there is any
+   * video. It is also capped: a provider that never reports would otherwise
+   * leave the notice sitting over film that is already playing, which is worse
+   * than saying nothing at all.
+   */
+  const [graceOver, setGraceOver] = useState(false);
+  useEffect(() => {
+    setGraceOver(false);
+    const timer = window.setTimeout(() => setGraceOver(true), 6000);
+    return () => window.clearTimeout(timer);
+  }, [frameKey]);
+
+  const waiting = !!embedUrl && !playback.reported && !graceOver;
+
   useEffect(() => {
     const sync = () => setIsFullscreen(document.fullscreenElement === boxRef.current);
     document.addEventListener("fullscreenchange", sync);
@@ -157,8 +178,22 @@ export default function EmbedPlayer({
         />
       ) : (
         /* Paused means the stream is torn down, so there is no frame to show. */
-        <div className="absolute inset-0 flex items-center justify-center bg-ink">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-ink">
           <span className="kicker text-muted-foreground">Paused</span>
+          {playback.position > 1 && (
+            <span className="font-mono text-[11px] tabular-nums text-bone/70">
+              {formatTime(playback.position)}
+            </span>
+          )}
+        </div>
+      )}
+
+      {waiting && (
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ink/70">
+          <Loader2 className="h-9 w-9 animate-spin text-acid" />
+          <span className="kicker text-bone">
+            {playback.position > 1 ? `Resuming at ${formatTime(playback.position)}` : "Starting"}
+          </span>
         </div>
       )}
 
