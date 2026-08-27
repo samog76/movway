@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import AppLayout from "@/components/AppLayout";
+import NativeBackButton from "@/components/NativeBackButton";
 import SearchPage from "./pages/SearchPage";
 import WatchPage from "./pages/WatchPage";
 import BrowsePage from "./pages/BrowsePage";
@@ -31,6 +32,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <Router>
+        <NativeBackButton />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/search" element={<AppLayout><SearchPage /></AppLayout>} />

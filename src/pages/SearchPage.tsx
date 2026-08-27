@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { searchMulti, Movie } from "@/lib/tmdb";
 import { Search, X } from "lucide-react";
@@ -8,7 +9,19 @@ import PageHeader from "@/components/PageHeader";
 const SUGGESTIONS = ["Dune", "Severance", "Akira", "Blade Runner", "Chainsaw Man"];
 
 export default function SearchPage() {
-  const [query, setQuery] = useState("");
+  /**
+   * The query lives in the URL rather than component state so that coming back
+   * from a title lands on the results the viewer left, instead of an empty box
+   * they have to type into again. Updates replace rather than push, so Back
+   * steps off the search screen instead of replaying the typing.
+   */
+  const [params, setParams] = useSearchParams();
+  const query = params.get("q") ?? "";
+  const setQuery = useCallback(
+    (value: string) => setParams(value ? { q: value } : {}, { replace: true }),
+    [setParams]
+  );
+
   const active = query.trim().length > 2;
 
   const { data, isFetching } = useQuery({

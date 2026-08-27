@@ -20,6 +20,8 @@ import {
 } from "@/lib/providers";
 import { upsertWatchEntry } from "@/lib/continueWatching";
 import { isTvDevice } from "@/lib/tv";
+import { registerBackInterceptor } from "@/lib/backHandler";
+import { Capacitor } from "@capacitor/core";
 import EpisodePicker from "@/components/EpisodePicker";
 import { ArrowLeft, Play, Star } from "lucide-react";
 import { useState, useEffect, useMemo, useRef, useCallback, ReactNode } from "react";
@@ -159,25 +161,50 @@ export default function WatchPage() {
    * Pushing a history entry first solves that: the remote's Back button pops it
    * instead of leaving the page, and popstate is the signal to take focus back.
    */
+  const leavePlayer = useCallback(() => {
+    setRemoteInPlayer(false);
+    window.focus();
+    // Put the remote back on the way in, so Back never dead-ends.
+    window.setTimeout(() => shieldRef.current?.focus(), 60);
+  }, []);
+
   const enterPlayer = useCallback(() => {
     const frame = iframeRef.current;
     if (!frame) return;
-    window.history.pushState({ movwayPlayerFocus: true }, "");
+    // On device the hardware Back is delivered natively and claimed by the
+    // interceptor below, so no history entry is needed — pushing one would
+    // cost two presses to get out. In a browser there is no hardware Back, so
+    // an entry is what makes the browser's own Back an escape hatch.
+    if (!Capacitor.isNativePlatform()) {
+      window.history.pushState(
+        { ...(window.history.state as object | null), movwayPlayerFocus: true },
+        ""
+      );
+    }
     frame.focus();
     setRemoteInPlayer(true);
   }, []);
 
+  /**
+   * While the embed holds the remote this document sees no keys at all, so
+   * Back is the only way out — and it must close the player rather than leave
+   * the page.
+   */
   useEffect(() => {
     if (!remoteInPlayer) return;
-    const onPopState = () => {
-      setRemoteInPlayer(false);
-      window.focus();
-      // Put the remote back on the way in, so Back never dead-ends.
-      window.setTimeout(() => shieldRef.current?.focus(), 60);
-    };
+    return registerBackInterceptor(() => {
+      leavePlayer();
+      return true;
+    });
+  }, [remoteInPlayer, leavePlayer]);
+
+  // Browser escape hatch, pairing with the pushState above.
+  useEffect(() => {
+    if (!remoteInPlayer || Capacitor.isNativePlatform()) return;
+    const onPopState = () => leavePlayer();
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, [remoteInPlayer]);
+  }, [remoteInPlayer, leavePlayer]);
 
   // Changing stream while the remote is inside would strand it on a dead frame.
   useEffect(() => {
