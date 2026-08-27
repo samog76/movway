@@ -5,7 +5,6 @@ const TMDB_API_KEY =
   "2dca580c2a14b55200e784d157207b4d";
 const BASE = "https://api.themoviedb.org/3";
 const IMG = "https://image.tmdb.org/t/p";
-const VIDCORE_BASE = "https://vidcore.net";
 const DEFAULT_IMAGE = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
 export const img = (path: string | null, size = "w500") =>
@@ -131,49 +130,3 @@ export interface Credits { cast: CastMember[] }
 export const getMovieCredits = (id: number) => tmdb<Credits>(`/movie/${id}/credits`);
 export const getTVCredits = (id: number) => tmdb<Credits>(`/tv/${id}/credits`);
 
-interface VidCoreCommonEmbedOptions {
-  title?: boolean;
-  poster?: boolean;
-  autoPlay?: boolean;
-  startAt?: number;
-  theme?: string;
-  server?: string;
-  hideServer?: boolean;
-  fullscreenButton?: boolean;
-  chromecast?: boolean;
-  sub?: string;
-}
-
-interface VidCoreTVEmbedOptions extends VidCoreCommonEmbedOptions {
-  nextButton?: boolean;
-  autoNext?: boolean;
-}
-
-const appendEmbedParams = (url: URL, params: Record<string, string | number | boolean | null | undefined>) => {
-  Object.entries(params).forEach(([key, value]) => {
-    if (value === null || value === undefined) return;
-    url.searchParams.set(key, String(value));
-  });
-};
-
-export const buildMovieEmbedUrl = (
-  tmdbId: number,
-  options: VidCoreCommonEmbedOptions = {}
-): string => {
-  const url = new URL(`${VIDCORE_BASE}/movie/${encodeURIComponent(String(tmdbId))}`);
-  appendEmbedParams(url, { autoPlay: true, ...options });
-  return url.toString();
-};
-
-export const buildTVEpisodeEmbedUrl = (
-  tmdbId: number,
-  season: number,
-  episode: number,
-  options: VidCoreTVEmbedOptions = {}
-): string => {
-  const url = new URL(
-    `${VIDCORE_BASE}/tv/${encodeURIComponent(String(tmdbId))}/${encodeURIComponent(String(season))}/${encodeURIComponent(String(episode))}`
-  );
-  appendEmbedParams(url, { autoPlay: true, ...options });
-  return url.toString();
-};

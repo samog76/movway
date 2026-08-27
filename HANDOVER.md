@@ -3,7 +3,7 @@
 Everything a fresh session needs to pick this up: what the app is, what was built,
 what was proven impossible and why, and where the work stands.
 
-**State:** v1.5.1 · versionCode 14 · 77 tests passing · `main` @ c217628
+**State:** v1.5.1 · versionCode 14 · 58 tests passing · `main` @ c217628
 
 ---
 
@@ -31,18 +31,19 @@ shouldn't be re-litigated without reason.
 | Browsing & search | **works** | Home, Browse, Search, watch page with episode picker and cast. Search keeps its query in the URL so Back returns to results. |
 | D-pad navigation | **works** | Geometric focus walker with zones. Focus lands on the player on arrival. |
 | Back button | **works** | Steps back through the app; exits only from the first screen. |
-| Native player | **backend is up** | Movway's own `<video>` + hls.js with working controls. Active once the backend address is set in Settings. |
-| Embedded players | **picture only** | VidLink (default) and VidCore in an iframe, with automatic fallback. No playback control is possible — see §3. |
+| Native player | **the only player** | Movway's own `<video>` + hls.js with working controls. Every title plays through it. |
+| Embedded players | **removed** | VidLink and VidCore are gone — they could only ever show a picture, and falling back to one hid a broken backend. See §3. |
 | Streaming backend | **deployed** | CinePro Core on Render at `https://cinepro-core-5kv0.onrender.com`. Enter it in Settings on each device. |
 
 ---
 
-## 3. Why there are two playback paths
+## 3. Why the embeds are gone
 
 The app originally played everything by embedding a third-party player in an `<iframe>`.
 On a TV that fails at the most basic level: **you cannot pause with the remote.** Four
 rounds went into trying to fix that inside the iframe before establishing it cannot be
-fixed there at all.
+fixed there at all. Those embeds have since been removed outright — the findings below are
+why, and they are kept so nobody proposes bringing them back.
 
 These are measured results, not assumptions. Re-testing them is wasted effort unless a
 provider changes.
@@ -72,10 +73,16 @@ With an OMSS backend, Movway plays the stream in its own `<video>`. Verified liv
 took playback `false → true`, forward-a-minute moved `8.5s → 68.5s`, and the scrub bar
 landed on exactly `300s` of a 635s title.
 
-So: **the embed path gives a picture and nothing else.** Its on-screen chrome can change
+So: **the embed path gave a picture and nothing else.** Its on-screen chrome could change
 source, change episode and go fullscreen, but not pause. The backend path is the only
-arrangement where a remote controls playback, and the backend it needs is now deployed
-(§4).
+arrangement where a remote controls playback, so it is now the only path there is.
+
+Keeping the embeds as a fallback had a second cost, less obvious than the first: a backend
+that was misconfigured, asleep or returning nothing still produced a picture, so it looked
+like it worked. Testing the backend was impossible while the thing it failed over to was
+indistinguishable from success. The watch page now names the fault instead — no backend
+set, unreachable, an `OMSS 500`, or nothing playable for that title — because there is no
+console on a television.
 
 ---
 
@@ -152,13 +159,11 @@ Auto-deploy is off, so upstream changes to the fork will not ship by themselves.
 | `src/lib/tv.ts` | The D-pad. Geometric focus walker with zones, key-code translation for real remote hardware, focus seeding. The most subtle file in the project. |
 | `src/lib/omss.ts` | Client for the streaming backend. Fetches sources, resolves proxy paths, ranks sources, flags addresses the packaged app can't reach. |
 | `src/components/NativePlayer.tsx` | Movway's own player: `<video>` + hls.js, controls that genuinely work, falls through to the next source on failure. |
-| `src/lib/providers.ts` | The two embed providers, VidLink and VidCore, and their URL builders. |
-| `src/lib/sourceFallback.ts` | When to abandon the default embed for the alternate. Policy only, so it can be read and tested alone. |
 | `src/lib/backHandler.ts` | Interceptor chain for the hardware Back button. Innermost surface claims the press first. |
 | `src/components/NativeBackButton.tsx` | Wires Android's Back to the router. Walks its own route stack rather than `history.go()`. |
 | `src/lib/tmdb.ts` | TMDB metadata. Uses native HTTP on device — see §7. |
-| `src/lib/faults.ts` | Turns an error into a cause and a fix, printed on screen. There is no console on a television. |
-| `src/pages/WatchPage.tsx` | Chooses between native player and embed; owns episode, source and subtitle state. |
+| `src/lib/faults.ts` | Turns an error into a cause and a fix, printed on screen. There is no console on a television. `describeBackendFault` is the streaming-backend reading. |
+| `src/pages/WatchPage.tsx` | Plays through the native player, or says plainly why it cannot; owns episode state. |
 | `src/pages/SettingsPage.tsx` | Backend address, connection test, https warning. |
 | `src/index.css` | Design tokens and the `html.tv` ten-foot overrides. |
 
@@ -220,7 +225,7 @@ in `download-site/index.html`.
 ```bash
 # checks — all must pass before shipping
 npx tsc --noEmit
-npm run test          # 77 tests
+npm run test          # 58 tests
 npm run lint
 npm run build
 

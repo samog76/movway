@@ -1,4 +1,4 @@
-import { describeFault } from "@/lib/faults";
+import { describeFault, type Fault } from "@/lib/faults";
 
 /**
  * Prints the cause of a failed request on screen. There is no console on a
@@ -8,12 +8,15 @@ export default function FaultReport({
   title,
   error,
   compact,
+  describe = describeFault,
 }: {
   title: string;
   error: unknown;
   compact?: boolean;
+  /** How to turn the error into words. Defaults to the TMDB reading. */
+  describe?: (error: unknown) => Fault;
 }) {
-  const fault = describeFault(error);
+  const fault = describe(error);
 
   return (
     <div className="border border-flare/40 bg-flare/5 px-4 py-3">
