@@ -13,6 +13,10 @@ const config: CapacitorConfig = {
     appendUserAgent: "MovwayTV",
     // Media embeds are third-party https; allow them inside the WebView.
     allowMixedContent: false,
+    // A sideloaded TV build has no console. This lets `chrome://inspect` attach
+    // over ADB and show the real console and network log, which is the only
+    // practical way to diagnose a set-top box.
+    webContentsDebuggingEnabled: true,
   },
   server: {
     androidScheme: "https",

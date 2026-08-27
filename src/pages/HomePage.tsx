@@ -13,6 +13,7 @@ import {
 import { getContinueWatching, removeWatchEntry, WatchEntry } from "@/lib/continueWatching";
 import HeroSection from "@/components/HeroSection";
 import ContentRow from "@/components/ContentRow";
+import FaultReport from "@/components/FaultReport";
 
 function RowSkeleton() {
   return (
@@ -30,29 +31,26 @@ function RowSkeleton() {
   );
 }
 
-function RowError({ label }: { label: string }) {
-  return (
-    <div className="border border-flare/40 bg-flare/5 px-4 py-3">
-      <span className="kicker text-flare">Reel Jammed</span>
-      <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-        Could not load {label}.
-      </p>
-    </div>
-  );
+function RowError({ label, error }: { label: string; error: unknown }) {
+  return <FaultReport title={`Reel jammed · ${label}`} error={error} compact />;
 }
 
 export default function HomePage() {
-  const { data: trending, isError: trendingError } = useQuery({
+  const { data: trending, isError: trendingError, error: trendingErr } = useQuery({
     queryKey: ["trending"],
     queryFn: getTrending,
     refetchInterval: 5 * 60 * 1000,
   });
-  const { data: trendingMovies, isError: trendingMoviesError } = useQuery({
+  const {
+    data: trendingMovies,
+    isError: trendingMoviesError,
+    error: trendingMoviesErr,
+  } = useQuery({
     queryKey: ["trendingMovies"],
     queryFn: getTrendingMovies,
     refetchInterval: 5 * 60 * 1000,
   });
-  const { data: trendingTV, isError: trendingTVError } = useQuery({
+  const { data: trendingTV, isError: trendingTVError, error: trendingTVErr } = useQuery({
     queryKey: ["trendingTV"],
     queryFn: getTrendingTV,
     refetchInterval: 5 * 60 * 1000,
@@ -100,14 +98,7 @@ export default function HomePage() {
   return (
     <div className="space-y-12 md:space-y-16">
       {trendingError ? (
-        <div className="flex aspect-[16/9] items-center justify-center border border-flare/40 bg-flare/5 sm:aspect-[21/9]">
-          <div className="text-center">
-            <span className="kicker text-flare">Projector Fault</span>
-            <p className="mt-2 font-mono text-xs text-muted-foreground">
-              Featured reel unavailable.
-            </p>
-          </div>
-        </div>
+        <FaultReport title="Projector fault" error={trendingErr} />
       ) : (
         <HeroSection movie={hero} />
       )}
@@ -124,8 +115,8 @@ export default function HomePage() {
         </div>
       )}
 
-      {trendingMoviesError && <RowError label="trending films" />}
-      {trendingTVError && <RowError label="trending series" />}
+      {trendingMoviesError && <RowError label="trending films" error={trendingMoviesErr} />}
+      {trendingTVError && <RowError label="trending series" error={trendingTVErr} />}
 
       {!trendingMovies && !trendingMoviesError && <RowSkeleton />}
       {!trendingTV && !trendingTVError && <RowSkeleton />}
