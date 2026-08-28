@@ -286,8 +286,8 @@ in `download-site/index.html`.
 
 ```bash
 # checks — all must pass before shipping
-npx tsc --noEmit
-npm run test          # 77 tests
+npm run typecheck     # tsc -b; plain `npx tsc --noEmit` checks NOTHING here
+npm run test          # 96 tests
 npm run lint
 npm run build
 
