@@ -9,6 +9,7 @@ import {
   saveBackendUrl,
 } from "@/lib/omss";
 import { describeFault } from "@/lib/faults";
+import UpdatePanel from "@/components/UpdatePanel";
 
 type Check =
   | { state: "idle" }
@@ -45,6 +46,8 @@ export default function SettingsPage() {
   return (
     <div className="space-y-8">
       <PageHeader kicker="Setup" title="Settings" />
+
+      <UpdatePanel />
 
       <section className="reveal max-w-3xl space-y-4 border border-border bg-card p-5">
         <div>
