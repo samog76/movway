@@ -13,7 +13,13 @@ import { upsertWatchEntry } from "@/lib/continueWatching";
 import NativePlayer from "@/components/NativePlayer";
 import FaultReport from "@/components/FaultReport";
 import { describeBackendFault } from "@/lib/faults";
-import { fetchEpisodeSources, fetchMovieSources, loadBackendUrl } from "@/lib/omss";
+import {
+  fetchEpisodeSources,
+  fetchMovieSources,
+  loadBackendUrl,
+  describeActiveSource,
+  type OmssSource,
+} from "@/lib/omss";
 import EpisodePicker from "@/components/EpisodePicker";
 import { ArrowLeft, Star } from "lucide-react";
 import { useState, useEffect, useMemo, useCallback, ReactNode } from "react";
@@ -75,6 +81,14 @@ export default function WatchPage() {
   const [backendUrl] = useState(() => loadBackendUrl());
   const [nativeUnplayable, setNativeUnplayable] = useState<string | null>(null);
 
+  /**
+   * Which source is playing, reported by the player rather than assumed here.
+   * A stream that fails hands over to the next one silently, so naming
+   * `sources[0]` would confidently print the wrong provider — and knowing
+   * which one you are actually watching is the whole point of showing it.
+   */
+  const [activeSource, setActiveSource] = useState<OmssSource | undefined>(undefined);
+
   const {
     data: streams,
     isError: streamsFailed,
@@ -120,6 +134,8 @@ export default function WatchPage() {
    * which would render as dead tabs, so keep only ones with episodes. Falls
    * back to synthesising from number_of_seasons when the field is absent.
    */
+  const sourceLabel = describeActiveSource(activeSource, playableStreams);
+
   const seasons = useMemo(() => {
     if (!movie || !isTV) return [];
     const listed = "seasons" in movie ? movie.seasons : undefined;
@@ -151,6 +167,7 @@ export default function WatchPage() {
   // A new title deserves a fresh attempt at the good path.
   useEffect(() => {
     setNativeUnplayable(null);
+    setActiveSource(undefined);
   }, [tmdbId, season, episode]);
 
   /**
@@ -242,7 +259,7 @@ export default function WatchPage() {
             {canPlay ? "Now Playing" : "No stream"}
           </span>
           <span className="ml-auto truncate font-mono text-[10px] uppercase tracking-[0.14em] text-acid">
-            {canPlay ? streams?.sources[0]?.provider?.name ?? "Direct" : "CinePro"}
+            {canPlay ? sourceLabel : "CinePro"}
             {isTV && ` · S${season}E${episode}`}
           </span>
         </div>
@@ -255,6 +272,7 @@ export default function WatchPage() {
             onPrevEpisode={isTV && episode > 1 ? () => selectEpisode(season, episode - 1) : undefined}
             onNextEpisode={isTV ? () => selectEpisode(season, episode + 1) : undefined}
             onUnplayable={setNativeUnplayable}
+            onActiveSourceChange={setActiveSource}
           />
         ) : (
           notice

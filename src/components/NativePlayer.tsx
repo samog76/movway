@@ -26,6 +26,13 @@ interface Props {
   onNextEpisode?: () => void;
   /** Called when nothing here can be played, so the page can fall back. */
   onUnplayable: (reason: string) => void;
+  /**
+   * The source actually playing, which is not always the first one: a stream
+   * that fails hands over to the next silently, and the viewer can switch by
+   * hand. Without this the page can only name `sources[0]`, which stops being
+   * true the moment either happens.
+   */
+  onActiveSourceChange?: (source: OmssSource | undefined) => void;
 }
 
 function Key({
@@ -71,6 +78,7 @@ export default function NativePlayer({
   onPrevEpisode,
   onNextEpisode,
   onUnplayable,
+  onActiveSourceChange,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -85,6 +93,10 @@ export default function NativePlayer({
   const [idle, setIdle] = useState(false);
 
   const source = sources[sourceIndex];
+
+  useEffect(() => {
+    onActiveSourceChange?.(source);
+  }, [source, onActiveSourceChange]);
 
   // Only WebVTT can be handed straight to a <track>; the others would need
   // converting, so they are not offered rather than silently doing nothing.
@@ -345,8 +357,14 @@ export default function NativePlayer({
 
           <span className="ml-auto flex items-center gap-0.5">
             {sources.length > 1 && (
-              <Key label={source.quality || "Quality"} onClick={cycleQuality} wide>
-                <span className="font-mono text-[10px]">HD</span>
+              <Key
+                label={`${source.provider?.name ?? "Source"} · ${source.quality || "auto"}`}
+                onClick={cycleQuality}
+                wide
+              >
+                <span className="font-mono text-[10px] tabular-nums">
+                  {sourceIndex + 1}/{sources.length}
+                </span>
               </Key>
             )}
             {vttSubtitles.length > 0 && (

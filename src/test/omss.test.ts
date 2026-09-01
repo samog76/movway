@@ -4,6 +4,7 @@ import {
   loadBackendUrl,
   saveBackendUrl,
   resolveUrl,
+  describeActiveSource,
   rankSources,
   isReachableFromPackagedApp,
   movieSourcesUrl,
@@ -90,6 +91,40 @@ describe("resolving proxy paths", () => {
 
   it("leaves a malformed url alone rather than throwing", () => {
     expect(resolveUrl("https://abc.trycloudflare.com", "http://")).toBe("http://");
+  });
+});
+
+describe("naming the source in play", () => {
+  const vix = { url: "/a", type: "hls", quality: "1080p", provider: { name: "VixSrc" } } as const;
+  const fshare = { url: "/b", type: "mp4", quality: "720p", provider: { name: "FshareTV" } } as const;
+
+  it("names the provider, the quality and the position", () => {
+    expect(describeActiveSource(vix, [vix, fshare])).toBe("VixSrc · 1080p · 1 of 2");
+  });
+
+  /**
+   * The reason this exists: a failed stream hands over silently, so the second
+   * source is what is playing while `sources[0]` still says the first.
+   */
+  it("names the source that took over, not the one that was tried first", () => {
+    expect(describeActiveSource(fshare, [vix, fshare])).toBe("FshareTV · 720p · 2 of 2");
+  });
+
+  it("leaves the position off when there is nothing to switch to", () => {
+    expect(describeActiveSource(vix, [vix])).toBe("VixSrc · 1080p");
+  });
+
+  it("falls back to Direct when the backend names no provider", () => {
+    const anon = { url: "/c", type: "hls", quality: "720p" } as const;
+    expect(describeActiveSource(anon, [anon])).toBe("Direct · 720p");
+  });
+
+  it("says Direct when nothing is playing yet", () => {
+    expect(describeActiveSource(undefined, [vix, fshare])).toBe("Direct");
+  });
+
+  it("does not claim a position for a source that is not in the list", () => {
+    expect(describeActiveSource(vix, [fshare])).toBe("VixSrc · 1080p");
   });
 });
 

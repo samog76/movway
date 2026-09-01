@@ -183,6 +183,27 @@ export async function fetchEpisodeSources(
   );
 }
 
+/**
+ * What is playing, in words: which provider served it, at what quality, and
+ * where it sits among the alternatives.
+ *
+ * Worth naming on screen because the answer is not obvious and not stable: a
+ * stream that fails hands over to the next one silently, so the source in play
+ * is often not the one that was picked. Reading `sources[0]` would print a
+ * confident, wrong answer.
+ */
+export function describeActiveSource(
+  active: OmssSource | undefined,
+  all: OmssSource[]
+): string {
+  if (!active) return "Direct";
+  const parts = [active.provider?.name?.trim() || "Direct"];
+  if (active.quality) parts.push(active.quality);
+  const position = all.indexOf(active);
+  if (all.length > 1 && position >= 0) parts.push(`${position + 1} of ${all.length}`);
+  return parts.join(" · ");
+}
+
 export interface OmssHealth {
   name?: string;
   version?: string;
