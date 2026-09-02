@@ -15,7 +15,7 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import type { OmssSource, OmssSubtitle } from "@/lib/omss";
+import { effectiveStreamType, type OmssSource, type OmssSubtitle } from "@/lib/omss";
 import { formatTime } from "@/lib/playTime";
 
 interface Props {
@@ -88,7 +88,13 @@ export default function NativePlayer({
   const [waiting, setWaiting] = useState(true);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [muted, setMuted] = useState(false);
+  /**
+   * Muted to begin with, because every browser refuses to autoplay a video
+   * with sound and refuses it silently — the stream loads, sits paused, and
+   * looks for all the world like a dead source. Muted autoplay is allowed
+   * everywhere, so the picture starts and the viewer unmutes.
+   */
+  const [muted, setMuted] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [idle, setIdle] = useState(false);
 
@@ -116,7 +122,9 @@ export default function NativePlayer({
       else onUnplayable(reason);
     };
 
-    if (source.type === "hls") {
+    const streamType = effectiveStreamType(source);
+
+    if (streamType === "hls") {
       if (video.canPlayType("application/vnd.apple.mpegurl")) {
         // Safari and some TV browsers play HLS themselves.
         video.src = source.url;
@@ -223,10 +231,9 @@ export default function NativePlayer({
 
   const restart = useCallback(() => seekTo(0), [seekTo]);
 
-  const toggleMute = useCallback(() => {
-    const video = videoRef.current;
-    if (video) video.muted = !video.muted;
-  }, []);
+  // State owns `muted` now that the element is controlled by it; setting the
+  // DOM directly here would fight React on the next render.
+  const toggleMute = useCallback(() => setMuted((m) => !m), []);
 
   const toggleFullscreen = useCallback(() => {
     if (document.fullscreenElement) void document.exitFullscreen();
@@ -267,6 +274,7 @@ export default function NativePlayer({
         className="absolute inset-0 h-full w-full bg-ink"
         playsInline
         autoPlay
+        muted={muted}
         crossOrigin="anonymous"
         title={title}
       >

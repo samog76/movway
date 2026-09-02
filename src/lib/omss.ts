@@ -115,6 +115,43 @@ export function resolveUrl(backendUrl: string, url: string): string {
   }
 }
 
+/**
+ * The stream type to actually play, which is not always the one declared.
+ *
+ * Providers mislabel constantly — an HLS playlist announced as `mp4` is
+ * common — and the declared type decides whether the player hands the URL to
+ * hls.js or straight to a `<video>`. Get it wrong and a perfectly good stream
+ * fails for a reason that looks like a dead link.
+ *
+ * The truth is available without guessing: a proxied source carries the real
+ * upstream URL inside its `data` parameter, so read it and believe the
+ * extension over the label. Anything ambiguous keeps the declared type, since
+ * a wrong correction is worse than no correction.
+ */
+export function effectiveStreamType(source: OmssSource): OmssSource["type"] {
+  const upstream = upstreamUrlOf(source.url);
+  if (!upstream) return source.type;
+  const path = upstream.split("?")[0].toLowerCase();
+  if (path.endsWith(".m3u8")) return "hls";
+  if (path.endsWith(".mpd")) return "dash";
+  if (path.endsWith(".mp4")) return "mp4";
+  if (path.endsWith(".webm")) return "webm";
+  return source.type;
+}
+
+/** The upstream address a proxy URL is standing in front of, if it is one. */
+function upstreamUrlOf(proxyUrl: string): string | null {
+  try {
+    const data = new URL(proxyUrl, "http://x").searchParams.get("data");
+    if (!data) return null;
+    const parsed: unknown = JSON.parse(data);
+    const url = (parsed as { url?: unknown })?.url;
+    return typeof url === "string" ? url : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Best first: highest resolution, and a stream type the browser can play. */
 const PLAYABLE: OmssSource["type"][] = ["hls", "mp4", "webm", "http", "dash", "mkv"];
 

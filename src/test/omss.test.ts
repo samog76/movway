@@ -5,6 +5,7 @@ import {
   saveBackendUrl,
   resolveUrl,
   describeActiveSource,
+  effectiveStreamType,
   rankSources,
   isReachableFromPackagedApp,
   movieSourcesUrl,
@@ -125,6 +126,50 @@ describe("naming the source in play", () => {
 
   it("does not claim a position for a source that is not in the list", () => {
     expect(describeActiveSource(vix, [fshare])).toBe("VixSrc · 1080p");
+  });
+});
+
+describe("believing the stream, not the label", () => {
+  const proxied = (upstream: string, declared: OmssSource["type"]) =>
+    ({
+      url: `https://tun.example.com/v1/proxy?data=${encodeURIComponent(JSON.stringify({ url: upstream }))}`,
+      type: declared,
+      quality: "1080p",
+    }) as OmssSource;
+
+  /**
+   * The case that matters: providers announce HLS playlists as mp4, and the
+   * declared type decides whether hls.js is used at all. Believing the label
+   * makes a good stream fail like a dead link.
+   */
+  it("corrects an HLS playlist that was announced as mp4", () => {
+    expect(effectiveStreamType(proxied("https://vixsrc.to/playlist/1.m3u8", "mp4"))).toBe("hls");
+  });
+
+  it("corrects an mp4 that was announced as hls", () => {
+    expect(effectiveStreamType(proxied("https://fsharetv.cc/media/a.mp4", "hls"))).toBe("mp4");
+  });
+
+  it("ignores the query string when reading the extension", () => {
+    expect(
+      effectiveStreamType(proxied("https://vixsrc.to/playlist/1.m3u8?token=abc&expires=1", "mp4"))
+    ).toBe("hls");
+  });
+
+  it("keeps the declared type when the address says nothing", () => {
+    expect(effectiveStreamType(proxied("https://cdn.example.com/stream", "hls"))).toBe("hls");
+  });
+
+  it("keeps the declared type for a source that is not proxied", () => {
+    expect(
+      effectiveStreamType({ url: "https://cdn.example.com/a.bin", type: "hls", quality: "720p" } as OmssSource)
+    ).toBe("hls");
+  });
+
+  it("keeps the declared type when the proxy payload is malformed", () => {
+    expect(
+      effectiveStreamType({ url: "https://tun.example.com/v1/proxy?data=not-json", type: "mp4", quality: "720p" } as OmssSource)
+    ).toBe("mp4");
   });
 });
 
