@@ -99,6 +99,18 @@ describe("moving on from a source that will not play", () => {
   });
 });
 
+describe("vidcore urls", () => {
+  const vidcore = getProvider("vidcore");
+
+  it("explicitly enables the embed fullscreen button for movie and TV urls", () => {
+    const movieUrl = new URL(vidcore.buildMovieUrl(603));
+    expect(movieUrl.searchParams.get("fullscreenButton")).toBe("true");
+
+    const tvUrl = new URL(vidcore.buildTVUrl(1399, 2, 5));
+    expect(tvUrl.searchParams.get("fullscreenButton")).toBe("true");
+  });
+});
+
 describe("vidapi urls", () => {
   const vidapi = getProvider("vidapi");
 

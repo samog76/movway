@@ -156,10 +156,16 @@ export const VIDEO_PROVIDERS: VideoProvider[] = [
     supportsStartAt: true,
     origin: "https://vidcore.net",
     buildMovieUrl: (id, opts = {}) =>
-      buildMovieEmbedUrl(id, { autoPlay: true, sub: opts.sub, startAt: opts.startAt }),
+      buildMovieEmbedUrl(id, {
+        autoPlay: true,
+        fullscreenButton: true,
+        sub: opts.sub,
+        startAt: opts.startAt,
+      }),
     buildTVUrl: (id, season, episode, opts = {}) =>
       buildTVEpisodeEmbedUrl(id, season, episode, {
         autoPlay: true,
+        fullscreenButton: true,
         nextButton: true,
         autoNext: true,
         sub: opts.sub,
