@@ -17,6 +17,11 @@ import {
 } from "lucide-react";
 import type { OmssSource, OmssSubtitle } from "@/lib/omss";
 import { formatTime } from "@/lib/playTime";
+import {
+  exitDocumentFullscreen,
+  getFullscreenElement,
+  requestElementFullscreen,
+} from "@/lib/fullscreen";
 
 interface Props {
   sources: OmssSource[];
@@ -185,9 +190,10 @@ export default function NativePlayer({
   }, []);
 
   useEffect(() => {
-    const sync = () => setIsFullscreen(document.fullscreenElement === boxRef.current);
-    document.addEventListener("fullscreenchange", sync);
-    return () => document.removeEventListener("fullscreenchange", sync);
+    const sync = () => setIsFullscreen(getFullscreenElement(document) === boxRef.current);
+    const events = ["fullscreenchange", "webkitfullscreenchange", "mozfullscreenchange", "MSFullscreenChange"];
+    events.forEach((eventName) => document.addEventListener(eventName, sync));
+    return () => events.forEach((eventName) => document.removeEventListener(eventName, sync));
   }, []);
 
   // ── Controls. Every one of these acts on our own element, so it simply works. ──
@@ -217,8 +223,11 @@ export default function NativePlayer({
   }, []);
 
   const toggleFullscreen = useCallback(() => {
-    if (document.fullscreenElement) void document.exitFullscreen();
-    else void boxRef.current?.requestFullscreen?.();
+    if (getFullscreenElement(document)) {
+      void exitDocumentFullscreen(document);
+      return;
+    }
+    void requestElementFullscreen(boxRef.current);
   }, []);
 
   const cycleSubtitle = useCallback(() => {

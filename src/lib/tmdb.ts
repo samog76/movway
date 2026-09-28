@@ -5,7 +5,7 @@ const TMDB_API_KEY =
   "2dca580c2a14b55200e784d157207b4d";
 const BASE = "https://api.themoviedb.org/3";
 const IMG = "https://image.tmdb.org/t/p";
-const VIDCORE_BASE = "https://vidcore.net";
+const VIDCORE_BASE = "https://vidcore.io";
 const DEFAULT_IMAGE = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
 export const img = (path: string | null, size = "w500") =>
