@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Maximize2, Minimize2 } from "lucide-react";
 import type { Playback } from "@/lib/embedBridge";
+import {
+  exitDocumentFullscreen,
+  getFullscreenElement,
+  requestElementFullscreen,
+} from "@/lib/fullscreen";
 import type { VideoProvider } from "@/lib/providers";
 
 interface Props {
@@ -43,6 +48,7 @@ export default function EmbedPlayer({
   onNotResponding,
   lastResort,
 }: Props) {
+  const boxRef = useRef<HTMLDivElement>(null);
   /**
    * The wait ends when the player reports in — not on the iframe's load event,
    * which fires when the provider's shell arrives, well before there is any
@@ -73,6 +79,22 @@ export default function EmbedPlayer({
    */
   const notResponding = !!embedUrl && !playback.reported && silentTooLong;
 
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    const sync = () => setIsFullscreen(getFullscreenElement(document) === boxRef.current);
+    const events = ["fullscreenchange", "webkitfullscreenchange", "mozfullscreenchange", "MSFullscreenChange"];
+    events.forEach((eventName) => document.addEventListener(eventName, sync));
+    return () => events.forEach((eventName) => document.removeEventListener(eventName, sync));
+  }, []);
+
+  useEffect(() => {
+    const frame = iframeRef.current;
+    if (!frame) return;
+    frame.setAttribute("allowfullscreen", "true");
+    frame.setAttribute("webkitallowfullscreen", "true");
+    frame.setAttribute("mozallowfullscreen", "true");
+  }, [iframeRef, frameKey]);
+
   // Told once per load, so the page can move to another source.
   const toldRef = useRef<string | null>(null);
   useEffect(() => {
@@ -81,8 +103,17 @@ export default function EmbedPlayer({
     onNotResponding();
   }, [notResponding, frameKey, onNotResponding]);
 
+  const toggleFullscreen = async () => {
+    const active = getFullscreenElement(document);
+    if (active) {
+      await exitDocumentFullscreen(document);
+      return;
+    }
+    await requestElementFullscreen(boxRef.current);
+  };
+
   return (
-    <div data-player-box className="relative aspect-video w-full overflow-hidden bg-ink">
+    <div ref={boxRef} data-player-box className="relative aspect-video w-full overflow-hidden bg-ink">
       <iframe
         ref={iframeRef}
         key={frameKey}
@@ -94,10 +125,20 @@ export default function EmbedPlayer({
         data-tv-autofocus
         className="absolute inset-0 h-full w-full border-0"
         allowFullScreen
-        allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+        allow="autoplay; encrypted-media; picture-in-picture; fullscreen *"
         referrerPolicy="origin"
         title={title}
       />
+
+      <button
+        type="button"
+        onClick={() => void toggleFullscreen()}
+        className="absolute right-2 top-2 z-10 inline-flex items-center gap-1 border border-border bg-ink/80 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-bone transition-colors hover:border-acid hover:bg-acid hover:text-ink focus-visible:border-acid focus-visible:bg-acid focus-visible:text-ink"
+        aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+        title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+      >
+        {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+      </button>
 
       {waiting && (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ink/70">
