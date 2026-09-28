@@ -154,7 +154,7 @@ export const VIDEO_PROVIDERS: VideoProvider[] = [
     name: "VidCore",
     supportsSubtitles: true,
     supportsStartAt: true,
-    origin: "https://vidcore.net",
+    origin: "https://vidcore.io",
     buildMovieUrl: (id, opts = {}) =>
       buildMovieEmbedUrl(id, {
         autoPlay: true,
