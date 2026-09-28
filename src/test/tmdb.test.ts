@@ -118,11 +118,26 @@ describe("tmdb embed URL builders", () => {
     const { buildMovieEmbedUrl, buildTVEpisodeEmbedUrl } = await import("@/lib/tmdb");
 
     expect(
-      buildMovieEmbedUrl(533535, { theme: "16A085", autoPlay: false, sub: "en", hideServer: true })
-    ).toBe("https://vidcore.net/movie/533535?autoPlay=false&theme=16A085&sub=en&hideServer=true");
+      buildMovieEmbedUrl(533535, {
+        theme: "16A085",
+        autoPlay: false,
+        sub: "en",
+        hideServer: true,
+        fullscreenButton: true,
+      })
+    ).toBe(
+      "https://vidcore.net/movie/533535?autoPlay=false&theme=16A085&sub=en&hideServer=true&fullscreenButton=true"
+    );
     expect(
-      buildTVEpisodeEmbedUrl(63174, 1, 5, { autoNext: true, nextButton: true, server: "Server 1" })
-    ).toBe("https://vidcore.net/tv/63174/1/5?autoPlay=true&autoNext=true&nextButton=true&server=Server+1");
+      buildTVEpisodeEmbedUrl(63174, 1, 5, {
+        autoNext: true,
+        nextButton: true,
+        server: "Server 1",
+        fullscreenButton: true,
+      })
+    ).toBe(
+      "https://vidcore.net/tv/63174/1/5?autoPlay=true&autoNext=true&nextButton=true&server=Server+1&fullscreenButton=true"
+    );
   });
 
   it("omits undefined parameters while preserving valid falsey values", async () => {
