@@ -35,14 +35,14 @@ classes there are the building blocks.
 | D-pad navigation | **works** | Geometric focus walker with zones. Focus lands on the player on arrival. |
 | Back button | **works** | Steps back through the app; exits only from the first screen. |
 | Native player | **needs a backend** | Movway's own `<video>` + hls.js with working controls. Active only when a streaming backend is configured. |
-| Embedded player | **works** | VixSrc leads, with VidLink and VidCore behind it as fallbacks. Movway draws its own controls over it: real position, working play/pause and seek — see §3. |
+| Embedded player | **default unproven** | vidsrc.mov leads by the owner's choice but was never seen to play from the development network — see §6c. VixSrc, VidLink and VidCore follow; VixSrc is the one measured to work (§3). |
 | Streaming backend | **next up** | Needs a CinePro Core instance on an **https** address. The one outstanding task. |
 
 ---
 
 ## 3. How playback is controlled
 
-VixSrc leads, with VidLink and VidCore behind it as fallbacks. What it supports was **measured against the live player**, not
+VixSrc sits behind vidsrc.mov (§6c), with VidLink and VidCore after it. What VixSrc supports was **measured against the live player**, not
 taken from its docs — and the docs were wrong in one place that mattered.
 
 | Capability | Result |
@@ -233,6 +233,38 @@ Consequences in code:
   source that states paused outright rather than leaving it to be inferred.
 - It still accepts **no inbound commands** — no `postMessage` receiver is documented and none
   was found. Pause is still frame-unload, seek is still a reload with `resumeAt`.
+
+## 6c. vidsrc.mov — the default, by request, unproven
+
+The owner asked for vidsrc.mov as the main source, so it is first in
+`VIDEO_PROVIDERS` and is what a device with no saved choice plays. A source
+picked by hand in the past is still remembered and still wins.
+
+From its published API: `/embed/movie/{id}` and `/embed/tv/{id}/{s}/{e}`, TMDB
+ids bare, no key. `?sub.info=` takes a URL to a JSON subtitle list, not a
+language, so Movway's subtitle picker is off for it. No start offset, autoplay
+or telemetry is documented, and anime is listed as unsupported.
+
+Measured 2026-10-27 from the development sandbox — two films and an episode,
+framed and top-level:
+
+- **It never played.** The title resolves behind a play button, but in nine
+  clicks no stream request went out and no `<video>` got a source.
+- **Clicks open pop-up windows** — a YouTube video, shopping sites — from two
+  ad-network scripts on vidsrc.mov's own page. It is a wrapper: vidsrc.mov
+  frames vsembed.ru, which frames the real player on a third domain.
+- **It cannot be sandboxed.** A sandboxed frame is the one way to forbid its
+  pop-ups, and it detects one and refuses to load.
+- **It reports nothing.** No messages reach Movway, so the stall watchdog would
+  have declared it dead twenty seconds into every film and switched to VixSrc.
+  `reportsPlayback: false` exempts it, which also means a vidsrc.mov that truly
+  fails is not abandoned automatically. The watch page says so under the
+  player and points at the source picker.
+
+**Not yet known: what its pop-ups do inside the TV app.** The Android WebView
+uses Capacitor's defaults, with no pop-up handling of its own. Try one click
+on a real device before shipping. If it leaves the app, blocking new windows
+in `MainActivity` is the fix, or move it out of first place.
 
 ## 7. Traps that cost real time
 

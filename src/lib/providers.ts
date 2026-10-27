@@ -44,6 +44,14 @@ export interface VideoProvider {
    */
   hidesOwnControls?: boolean;
   /**
+   * Whether the player posts playback telemetry to Movway. Only a source that
+   * reports can be judged "silent", so the stall watchdog — which moves to the
+   * next source after twenty seconds without a word — skips one that never
+   * reports; otherwise it would abandon that source every time, mid-film.
+   * Defaults to true.
+   */
+  reportsPlayback?: boolean;
+  /**
    * Whether Movway may switch to this source on its own when another refuses to
    * play. A source the app has never seen play is fine to *offer* — the viewer
    * may be on a network where it works — but falling back to it automatically
@@ -116,7 +124,36 @@ const vidapiUrl = (base: string, opts: ProviderBuildOptions): string => {
 };
 
 /**
- * VixSrc first, then somewhere else to go.
+ * vidsrc.mov, from its published API (https://vidsrc.mov, read 2026-10-27):
+ *
+ *   • `/embed/movie/{id}` and `/embed/tv/{id}/{season}/{episode}`, taking a
+ *     TMDB id bare or an IMDb `tt` id. Movway carries TMDB ids, so no
+ *     translation. No key.
+ *   • `?sub.info=` takes the URL of a JSON subtitle list. There is no language
+ *     parameter, and Movway has no subtitle files to point it at, so the
+ *     subtitle picker stays off for this source; its own player has a menu.
+ *   • No start offset, autoplay or telemetry is documented. Anime is listed
+ *     as unsupported.
+ *
+ * Measured from the development sandbox the same day — two films and an
+ * episode, framed as Movway frames it and top-level:
+ *
+ *   • It is a wrapper. The page loads two ad-network scripts and a tracker,
+ *     then frames vsembed.ru, which frames the real player on another domain.
+ *     The title resolves (poster and name appear) behind a play button.
+ *   • Clicks open pop-up windows (a YouTube video, shopping sites) before the
+ *     player responds. Not once in nine clicks did a stream request go out or
+ *     a <video> get a source, so it was never seen to play from that network.
+ *   • It relays no messages outward, so Movway hears nothing. Hence
+ *     `reportsPlayback: false`.
+ *   • In a sandboxed frame — the one way to forbid its pop-ups — it refuses to
+ *     load and says so.
+ */
+const vidsrcMovUrl = (path: string): string => `https://vidsrc.mov/embed/${path}`;
+
+/**
+ * vidsrc.mov first, by the owner's choice, then VixSrc and the others behind
+ * it.
  *
  * A source can simply refuse a viewer — a rate limit, a bot check, an outage —
  * and it says so by rendering its own page inside the frame, which cannot be
@@ -126,6 +163,17 @@ const vidapiUrl = (base: string, opts: ProviderBuildOptions): string => {
  * a few seconds rather than the whole app.
  */
 export const VIDEO_PROVIDERS: VideoProvider[] = [
+  {
+    id: "vidsrc",
+    autoFallback: true,
+    name: "VidSrc",
+    supportsSubtitles: false,
+    supportsStartAt: false,
+    reportsPlayback: false,
+    origin: "https://vidsrc.mov",
+    buildMovieUrl: (id) => vidsrcMovUrl(`movie/${id}`),
+    buildTVUrl: (id, season, episode) => vidsrcMovUrl(`tv/${id}/${season}/${episode}`),
+  },
   {
     id: "vixsrc",
     autoFallback: true,

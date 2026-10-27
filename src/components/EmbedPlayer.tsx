@@ -57,16 +57,19 @@ export default function EmbedPlayer({
    */
   const [graceOver, setGraceOver] = useState(false);
   const [silentTooLong, setSilentTooLong] = useState(false);
+  // Silence only means something from a source that reports at all. One that
+  // never does would be declared dead twenty seconds into every film.
+  const watched = provider.reportsPlayback !== false;
   useEffect(() => {
     setGraceOver(false);
     setSilentTooLong(false);
     const settling = window.setTimeout(() => setGraceOver(true), 6000);
-    const stalled = window.setTimeout(() => setSilentTooLong(true), 20000);
+    const stalled = watched ? window.setTimeout(() => setSilentTooLong(true), 20000) : undefined;
     return () => {
       window.clearTimeout(settling);
       window.clearTimeout(stalled);
     };
-  }, [frameKey]);
+  }, [frameKey, watched]);
 
   const waiting = !!embedUrl && !playback.reported && !graceOver;
 

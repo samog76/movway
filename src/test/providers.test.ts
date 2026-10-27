@@ -11,16 +11,13 @@ import {
 beforeEach(() => window.localStorage.clear());
 
 describe("providers registry", () => {
-  it("leads with VixSrc and keeps somewhere to fall back to", () => {
-    expect(VIDEO_PROVIDERS.map((p) => p.id)).toEqual(["vixsrc", "vidlink", "vidcore", "vidapi"]);
-    expect(DEFAULT_PROVIDER_ID).toBe("vixsrc");
+  it("leads with vidsrc.mov and keeps somewhere to fall back to", () => {
+    expect(VIDEO_PROVIDERS.map((p) => p.id)).toEqual(["vidsrc", "vixsrc", "vidlink", "vidcore", "vidapi"]);
+    expect(DEFAULT_PROVIDER_ID).toBe("vidsrc");
   });
 
-  it("every source can be seeked, since that is how the controls work", () => {
-    for (const p of VIDEO_PROVIDERS) {
-      expect(p.supportsStartAt, `${p.id} cannot seek`).toBe(true);
-      expect(p.origin).toMatch(/^https:\/\//);
-    }
+  it("every source is served over https", () => {
+    for (const p of VIDEO_PROVIDERS) expect(p.origin).toMatch(/^https:\/\//);
   });
 
   it("declares the capabilities the controls are built on", () => {
@@ -76,6 +73,7 @@ describe("vixsrc urls", () => {
 
 describe("moving on from a source that will not play", () => {
   it("walks the list in order", () => {
+    expect(nextProviderId("vidsrc")).toBe("vixsrc");
     expect(nextProviderId("vixsrc")).toBe("vidlink");
     expect(nextProviderId("vidlink")).toBe("vidcore");
   });
@@ -88,7 +86,7 @@ describe("moving on from a source that will not play", () => {
 
   it("does not loop back round", () => {
     const seen = new Set<string>();
-    let id: string | null = "vixsrc";
+    let id: string | null = DEFAULT_PROVIDER_ID;
     while (id) {
       expect(seen.has(id), `revisited ${id}`).toBe(false);
       seen.add(id);
@@ -182,5 +180,32 @@ describe("a source the app will offer but not choose", () => {
     saveProviderId("vidapi");
     expect(loadProviderId()).toBe("vidapi");
     expect(getProvider("vidapi").name).toBe("VidAPI");
+  });
+});
+
+describe("vidsrc.mov", () => {
+  const vidsrc = getProvider("vidsrc");
+
+  it("uses the documented embed paths with a bare TMDB id", () => {
+    expect(vidsrc.buildMovieUrl(27205)).toBe("https://vidsrc.mov/embed/movie/27205");
+    expect(vidsrc.buildTVUrl(1396, 2, 5)).toBe("https://vidsrc.mov/embed/tv/1396/2/5");
+  });
+
+  it("adds no undocumented parameters, even when asked for a language or offset", () => {
+    expect(vidsrc.buildMovieUrl(27205, { sub: "fr", startAt: 300 })).toBe("https://vidsrc.mov/embed/movie/27205");
+  });
+
+  it("declares what it cannot do, so the page does not offer it", () => {
+    expect(vidsrc.supportsSubtitles).toBe(false);
+    expect(vidsrc.supportsStartAt).toBe(false);
+    // It relays no telemetry; silence from it means nothing.
+    expect(vidsrc.reportsPlayback).toBe(false);
+    expect(vidsrc.origin).toBe("https://vidsrc.mov");
+  });
+
+  it("leaves the others watched by the stall watchdog", () => {
+    for (const p of VIDEO_PROVIDERS.filter((p) => p.id !== "vidsrc")) {
+      expect(p.reportsPlayback, p.id).not.toBe(false);
+    }
   });
 });

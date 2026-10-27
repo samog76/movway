@@ -361,6 +361,12 @@ export default function WatchPage() {
                 Use the player's own subtitle menu for this source.
               </span>
             )}
+            {!useNativePlayer && provider.reportsPlayback === false && (
+              <span className="w-full text-xs text-white/45">
+                {provider.name} doesn't report whether it is playing, so Movway won't switch away from it
+                on its own. If it doesn't start, pick another source above.
+              </span>
+            )}
           </div>
         </div>
 
