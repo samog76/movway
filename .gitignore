@@ -35,5 +35,6 @@ dist-ssr
 .env.test.local
 .env.production.local
 
-# Local agent/editor tooling
-.claude/
+# Local agent/editor tooling (project skills are tracked)
+.claude/*
+!.claude/skills/
