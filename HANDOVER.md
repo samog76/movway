@@ -335,6 +335,27 @@ installs it on the device.
 The updater cannot deliver itself: a device must be on 1.9.0 or later before any of this runs,
 so that one install is still by hand.
 
+## 8c. Reverse engineering with REA
+
+The `reverse-engineer-anything` skill (rea-agents 6.8.0) lives in
+`.claude/skills/`. It is for questions this repo's source cannot answer: what a
+shipped APK actually contains, or what a provider's player does at runtime.
+For Movway's own code, read the source.
+
+The skill is instructions only. `scripts/setup-rea.sh` installs what it drives:
+Node 24 (REA refuses the image's Node 22.22), the `rea` CLI and MCP server,
+the JADX headless MCP JAR and Apktool 3.0.3, then registers `rea` with Claude
+Code. Cloud containers are discarded between sessions, so put this line in the
+environment's setup script to have it on every start:
+
+```bash
+bash /home/user/movway/scripts/setup-rea.sh
+```
+
+Measured working: `rea inspect-android-package download-site/movway.apk` reads
+the package through JADX. The static JavaScript analyser is slow on the 1 MB
+minified bundle inside the APK, so give it a long deadline.
+
 ## 9. Worth doing after the backend is up
 
 - **Cast and footer are unreachable with a remote.** Cast entries are plain `<div>`s with no
