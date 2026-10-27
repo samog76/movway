@@ -16,15 +16,15 @@ export default function FaultReport({
   const fault = describeFault(error);
 
   return (
-    <div className="border border-flare/40 bg-flare/5 px-4 py-3">
-      <span className="kicker text-flare">{title}</span>
-      <p className="mt-1.5 font-mono text-[12px] text-bone">{fault.cause}</p>
+    <div className="rounded-2xl border border-flare/40 bg-flare/10 px-5 py-4">
+      <span className="text-sm font-semibold text-red-300">{title}</span>
+      <p className="mt-1.5 text-sm text-white">{fault.cause}</p>
       {!compact && (
-        <p className="mt-1.5 max-w-2xl font-mono text-[11px] leading-relaxed text-muted-foreground">
+        <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-white/60">
           {fault.hint}
         </p>
       )}
-      <p className="mt-1.5 font-mono text-[10px] text-muted-foreground/60">{fault.detail}</p>
+      <p className="mt-1.5 text-xs text-white/40">{fault.detail}</p>
     </div>
   );
 }

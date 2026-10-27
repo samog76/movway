@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { searchMulti, Movie } from "@/lib/tmdb";
 import { Search, X } from "lucide-react";
 import { PosterCard } from "@/components/ContentRow";
-import PageHeader from "@/components/PageHeader";
+import PageHeader, { POSTER_GRID } from "@/components/PageHeader";
 
 const SUGGESTIONS = ["Dune", "Severance", "Akira", "Blade Runner", "Chainsaw Man"];
 
@@ -38,53 +38,45 @@ export default function SearchPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        kicker="Index"
         title="Search"
         aside={
           active && !isFetching ? (
-            <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
-              {String(results.length).padStart(3, "0")} HITS
-            </span>
+            <span className="text-sm text-white/50">{results.length} results</span>
           ) : undefined
         }
       />
 
-      {/* ── Search field: a slab, not a pill ── */}
-      <div className="reveal flex max-w-2xl items-stretch border-2 border-border transition-colors focus-within:border-acid">
-        <span className="flex items-center bg-acid px-3.5 text-ink">
-          <Search size={17} strokeWidth={2.5} />
-        </span>
+      <div className="glass flex max-w-2xl items-center gap-3 rounded-full px-5 transition-shadow focus-within:ring-2 focus-within:ring-white/70">
+        <Search size={20} className="shrink-0 text-white/60" />
         <input
           type="text"
           value={query}
           autoFocus
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="TITLE, SERIES, ANIME…"
-          className="min-w-0 flex-1 bg-card px-4 py-3.5 font-mono text-xs uppercase tracking-[0.12em] text-bone placeholder:text-muted-foreground/60 focus:outline-none"
+          placeholder="Movies, series, anime…"
+          aria-label="Search"
+          className="min-w-0 flex-1 bg-transparent py-4 text-base text-white placeholder:text-white/40 focus:outline-none"
         />
         {query && (
           <button
             onClick={() => setQuery("")}
             aria-label="Clear search"
-            className="flex items-center bg-card px-3 text-muted-foreground transition-colors hover:text-flare focus-visible:text-flare"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white focus-visible:bg-white/10 focus-visible:text-white"
           >
-            <X size={15} />
+            <X size={16} />
           </button>
         )}
       </div>
 
-      {/* ── States ── */}
       {!active ? (
-        <div className="reveal space-y-4" style={{ animationDelay: "90ms" }}>
-          <p className="font-mono text-[11px] text-muted-foreground">
-            Type at least three characters. Or start here:
-          </p>
+        <div className="space-y-4">
+          <p className="text-sm text-white/50">Type at least three characters, or try one of these:</p>
           <div className="flex flex-wrap gap-2">
             {SUGGESTIONS.map((s) => (
               <button
                 key={s}
                 onClick={() => setQuery(s)}
-                className="border border-border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground transition-colors hover:border-acid focus-visible:border-acid hover:bg-acid focus-visible:bg-acid hover:text-ink focus-visible:text-ink"
+                className="glass rounded-full px-4 py-2 text-sm font-medium text-white/80 transition-colors hover:bg-white hover:text-black focus-visible:bg-white focus-visible:text-black"
               >
                 {s}
               </button>
@@ -92,32 +84,22 @@ export default function SearchPage() {
           </div>
         </div>
       ) : isFetching ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 md:gap-4 lg:grid-cols-5 xl:grid-cols-6">
+        <div className={POSTER_GRID}>
           {Array.from({ length: 12 }).map((_, i) => (
-            <div key={i} className="aspect-[2/3] animate-pulse border border-border bg-card" />
+            <div key={i} className="aspect-[2/3] animate-pulse rounded-lg bg-card" />
           ))}
         </div>
       ) : results.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 md:gap-4 lg:grid-cols-5 xl:grid-cols-6">
-          {results.map((item, i) => (
-            <div
-              key={`${item.media_type}-${item.id}`}
-              className="reveal"
-              style={{ animationDelay: `${Math.min(i * 28, 400)}ms` }}
-            >
-              <PosterCard item={item} />
-            </div>
+        <div className={POSTER_GRID}>
+          {results.map((item) => (
+            <PosterCard key={`${item.media_type}-${item.id}`} item={item} />
           ))}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center border border-dashed border-border py-20 text-center">
-          <span className="font-display text-6xl font-extrabold leading-none text-stroke">—</span>
-          <p className="mt-5 font-display text-xl font-extrabold uppercase tracking-tight text-bone">
-            No Prints Found
-          </p>
-          <p className="mt-2 font-mono text-[11px] text-muted-foreground">
-            Nothing in the vault matches “{query}”.
-          </p>
+        <div className="glass flex flex-col items-center rounded-2xl px-6 py-20 text-center">
+          <Search size={36} className="text-white/40" />
+          <p className="mt-5 text-xl font-semibold text-white">No results</p>
+          <p className="mt-2 text-sm text-white/60">Nothing matches “{query}”.</p>
         </div>
       )}
     </div>

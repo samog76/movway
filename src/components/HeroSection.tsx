@@ -1,119 +1,162 @@
-import { Play, Plus, Star } from "lucide-react";
-import { Movie, backdrop } from "@/lib/tmdb";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { CalendarDays, Play, Star, Tag } from "lucide-react";
+import { Movie, backdrop, genreName, getLogo, img, mediaTypeOf } from "@/lib/tmdb";
+import MyListButton from "./MyListButton";
 
-interface Props {
-  movie: Movie | null;
-}
+const ROTATE_MS = 9000;
 
-/** Film alignment crosses in each corner of the frame. */
-function RegistrationMark({ className }: { className: string }) {
+/** The film's own title art when TMDB has it; set type when it does not. */
+export function TitleArt({
+  logoPath,
+  title,
+  className = "",
+}: {
+  logoPath: string | null | undefined;
+  title: string;
+  className?: string;
+}) {
+  if (logoPath) {
+    return (
+      <img
+        src={img(logoPath, "w500")}
+        alt={title}
+        className={`hero-logo max-h-[9.5rem] w-auto max-w-[min(34rem,82vw)] object-contain drop-shadow-[0_4px_24px_rgb(0_0_0/0.55)] ${className}`}
+      />
+    );
+  }
   return (
-    <span aria-hidden className={`pointer-events-none absolute ${className}`}>
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-        <path d="M9 0v18M0 9h18" stroke="hsl(var(--bone))" strokeOpacity="0.45" strokeWidth="1" />
-      </svg>
-    </span>
+    <h1
+      className={`max-w-[44rem] text-[clamp(2.5rem,6.5vw,5.5rem)] font-black uppercase leading-[0.9] tracking-[-0.04em] text-white drop-shadow-[0_4px_24px_rgb(0_0_0/0.55)] ${className}`}
+    >
+      {title}
+    </h1>
   );
 }
 
-export default function HeroSection({ movie }: Props) {
-  if (!movie) {
-    return (
-      <div className="space-y-4">
-        <div className="aspect-[21/9] w-full animate-pulse border border-border bg-card" />
-        <div className="h-14 w-2/3 animate-pulse bg-card" />
-      </div>
-    );
-  }
+export function HeroSkeleton() {
+  return <div className="h-[92svh] max-h-[1000px] min-h-[560px] w-full animate-pulse bg-card md:h-[100svh]" />;
+}
+
+/**
+ * Full-bleed rotating feature. Rotation stops while the pointer or the remote
+ * is inside it: the Play button must not quietly start pointing at a
+ * different title while someone is about to press it.
+ */
+export default function HeroSection({ items }: { items: Movie[] }) {
+  const [index, setIndex] = useState(0);
+  const [held, setHeld] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
+  const count = items.length;
+  const movie = items[Math.min(index, count - 1)];
+
+  useEffect(() => {
+    if (held || count < 2) return;
+    const t = window.setTimeout(() => setIndex((i) => (i + 1) % count), ROTATE_MS);
+    return () => window.clearTimeout(t);
+  }, [index, held, count]);
+
+  const type = movie ? mediaTypeOf(movie) : "movie";
+  const { data: logoPath } = useQuery({
+    queryKey: ["logo", type, movie?.id],
+    queryFn: () => getLogo(type, movie!.id),
+    enabled: !!movie,
+    staleTime: Infinity,
+  });
+
+  if (!movie) return <HeroSkeleton />;
 
   const title = movie.title || movie.name || "";
-  const type =
-    movie.media_type === "tv" || movie.first_air_date || (movie.name && !movie.title)
-      ? "tv"
-      : "movie";
   const year = (movie.release_date || movie.first_air_date || "").slice(0, 4);
+  const genre = movie.genre_ids?.map(genreName).find(Boolean);
 
   return (
-    <section className="reveal relative">
-      {/* ── The frame ── */}
-      <div className="scanlines group relative aspect-[16/9] overflow-hidden border border-border sm:aspect-[21/9]">
-        <img
-          src={backdrop(movie.backdrop_path)}
-          alt={title}
-          className="absolute inset-0 h-full w-full scale-105 object-cover transition-transform ease-out [transition-duration:1600ms] group-hover:scale-100 group-focus-visible:scale-100"
-        />
+    <section
+      ref={sectionRef}
+      aria-roledescription="carousel"
+      aria-label="Featured"
+      onMouseEnter={() => setHeld(true)}
+      onMouseLeave={() => setHeld(false)}
+      onFocus={() => setHeld(true)}
+      onBlur={(e) => {
+        if (!sectionRef.current?.contains(e.relatedTarget as Node)) setHeld(false);
+      }}
+      className="relative h-[92svh] max-h-[1000px] min-h-[560px] w-full overflow-hidden md:h-[100svh]"
+    >
+      <img
+        key={movie.id}
+        src={backdrop(movie.backdrop_path)}
+        alt=""
+        className="absolute inset-0 h-full w-full animate-hero-fade object-cover object-[center_25%]"
+      />
+      {/* Grade toward the ground so type always reads, and the rows below
+          rise out of the picture rather than butting against it. */}
+      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-background/0" />
+      <div className="absolute inset-0 hidden bg-gradient-to-r from-background/80 via-background/25 to-transparent md:block" />
+      <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/50 to-transparent" />
 
-        {/* Grade the plate toward ink so type always reads */}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/45 to-background/10" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background/85 via-transparent to-transparent" />
+      <div className="hero-body tv-safe absolute inset-x-0 bottom-[13%] flex md:bottom-[21%] flex-col items-center px-6 text-center md:items-start md:px-16 md:text-left">
+        <div key={movie.id} className="flex animate-hero-fade flex-col items-center md:items-start">
+          <TitleArt logoPath={logoPath} title={title} className="object-center md:object-left" />
 
-        {/* Letterbox bars */}
-        <div className="absolute inset-x-0 top-0 h-[7%] bg-ink" />
-        <div className="absolute inset-x-0 bottom-0 h-[7%] bg-ink" />
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[15px] font-medium text-white md:text-[17px]">
+            {movie.vote_average ? (
+              <span className="flex items-center gap-1.5">
+                <Star size={17} className="fill-white" />
+                {movie.vote_average.toFixed(1)}/10
+              </span>
+            ) : null}
+            {year && (
+              <>
+                <span aria-hidden className="text-white/50">·</span>
+                <span className="flex items-center gap-1.5">
+                  <CalendarDays size={17} />
+                  {year}
+                </span>
+              </>
+            )}
+            {genre && (
+              <>
+                <span aria-hidden className="text-white/50">·</span>
+                <span className="flex items-center gap-1.5">
+                  <Tag size={16} />
+                  {genre}
+                </span>
+              </>
+            )}
+          </div>
 
-        <RegistrationMark className="left-3 top-[9%]" />
-        <RegistrationMark className="right-3 top-[9%]" />
-        <RegistrationMark className="bottom-[9%] left-3" />
-        <RegistrationMark className="bottom-[9%] right-3" />
-
-        {/* Slate: top-left */}
-        <div className="absolute left-5 top-[11%] flex items-center gap-2 sm:left-8">
-          <span className="h-1.5 w-1.5 rounded-full bg-flare animate-flicker" />
-          <span className="kicker text-bone/80">Feature Presentation</span>
-        </div>
-
-        {/* Rating chip: top-right */}
-        <div className="absolute right-5 top-[11%] flex items-center gap-1.5 border border-bone/25 bg-ink/70 px-2 py-1 backdrop-blur-sm sm:right-8">
-          <Star size={11} className="fill-acid text-acid" />
-          <span className="font-mono text-[11px] font-bold tabular-nums text-bone">
-            {movie.vote_average ? movie.vote_average.toFixed(1) : "—"}
-          </span>
-        </div>
-      </div>
-
-      {/* ── Title block: deliberately breaks out of the frame above ── */}
-      <div className="relative z-10 -mt-10 px-1 sm:-mt-16 md:-mt-20 md:pl-6">
-        <h1 className="font-display font-variation-tight max-w-5xl text-[clamp(2rem,7vw,5.5rem)] font-extrabold uppercase leading-[0.86] tracking-[-0.05em] text-bone [text-shadow:0_4px_28px_hsl(var(--ink))]">
-          {title}
-        </h1>
-
-        {/* Slate data rail */}
-        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="bg-acid px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-ink">
-            {type === "tv" ? "Series" : "Film"}
-          </span>
-          {year && (
-            <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{year}</span>
-          )}
-          <span className="h-3 w-px bg-border" />
-          <span className="kicker text-muted-foreground">Reel 01</span>
-        </div>
-
-        <div className="mt-4 hidden max-w-xl sm:block">
-          <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+          <p className="hero-overview mt-5 line-clamp-2 max-w-[36rem] text-[15px] leading-relaxed text-white/95 drop-shadow md:line-clamp-4 md:text-[17px] md:leading-7">
             {movie.overview}
           </p>
         </div>
 
-        {/* ── Actions ── */}
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <Link
-            to={`/watch/${type}/${movie.id}`}
-            className="group/play inline-flex items-center gap-2.5 border-2 border-acid bg-acid px-6 py-3 text-ink transition-all duration-200 hover:-translate-x-0.5 focus-visible:-translate-x-0.5 hover:-translate-y-0.5 focus-visible:-translate-y-0.5 hover:shadow-hard-flare focus-visible:shadow-hard-flare"
-          >
-            <Play size={15} fill="currentColor" />
-            <span className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]">
-              Play Now
-            </span>
-          </Link>
+        <div className="mt-7 flex w-full items-center justify-center gap-3 md:justify-between">
+          <div className="flex items-center gap-3">
+            <Link to={`/watch/${type}/${movie.id}`} data-tv-autofocus className="btn-play">
+              <Play size={20} fill="currentColor" />
+              Play
+            </Link>
+            <MyListButton item={{ ...movie, media_type: type }} />
+          </div>
 
-          <button className="inline-flex items-center gap-2.5 border-2 border-border bg-transparent px-5 py-3 text-bone transition-all duration-200 hover:border-acid focus-visible:border-acid hover:text-acid focus-visible:text-acid">
-            <Plus size={15} />
-            <span className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]">
-              Watchlist
-            </span>
-          </button>
+          {count > 1 && (
+            <div className="hidden items-center gap-2 md:flex" role="tablist" aria-label="Featured titles">
+              {items.map((m, i) => (
+                <button
+                  key={m.id}
+                  role="tab"
+                  aria-selected={i === index}
+                  aria-label={`Show ${m.title || m.name}`}
+                  onClick={() => setIndex(i)}
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    i === index ? "w-8 bg-white" : "w-2 bg-white/45 hover:bg-white/80 focus-visible:bg-white/80"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </section>

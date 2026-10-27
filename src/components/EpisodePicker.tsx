@@ -37,23 +37,21 @@ function EpisodeRow({
       type="button"
       onClick={onSelect}
       aria-current={active}
-      className={`group/ep flex w-full items-center gap-3 border p-2 text-left transition-colors ${
-        active
-          ? "border-acid bg-acid/10"
-          : "border-border bg-card hover:border-acid/60 focus-visible:border-acid/60"
+      className={`group/ep flex w-full items-center gap-4 rounded-xl p-2.5 text-left transition-colors ${
+        active ? "bg-white/12 ring-1 ring-white/25" : "hover:bg-white/5 focus-visible:bg-white/5"
       }`}
     >
       {/* Episode number */}
       <span
-        className={`w-9 shrink-0 text-center font-mono text-sm font-bold tabular-nums ${
-          active ? "text-acid" : "text-muted-foreground"
+        className={`w-8 shrink-0 text-center text-lg font-semibold tabular-nums ${
+          active ? "text-white" : "text-white/40"
         }`}
       >
-        {String(ep.episode_number).padStart(2, "0")}
+        {ep.episode_number}
       </span>
 
       {/* Still */}
-      <span className="relative hidden aspect-video w-24 shrink-0 overflow-hidden bg-secondary sm:block">
+      <span className="relative hidden aspect-video w-32 shrink-0 overflow-hidden rounded-lg bg-card sm:block">
         {ep.still_path ? (
           <img
             src={img(ep.still_path, "w300")}
@@ -63,8 +61,8 @@ function EpisodeRow({
           />
         ) : null}
         {active && (
-          <span className="absolute inset-0 flex items-center justify-center bg-ink/60">
-            <Play size={13} className="fill-acid text-acid" />
+          <span className="absolute inset-0 flex items-center justify-center bg-black/50">
+            <Play size={18} className="fill-white text-white" />
           </span>
         )}
       </span>
@@ -72,13 +70,13 @@ function EpisodeRow({
       {/* Title + meta */}
       <span className="min-w-0 flex-1">
         <span
-          className={`block truncate text-[13px] font-semibold ${
-            active ? "text-acid" : "text-bone"
+          className={`block truncate text-[15px] font-semibold ${
+            active ? "text-white" : "text-white/85"
           }`}
         >
           {ep.name || `Episode ${ep.episode_number}`}
         </span>
-        <span className="mt-0.5 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+        <span className="mt-1 flex items-center gap-2 text-[13px] text-white/50">
           {ep.runtime ? <span>{ep.runtime} min</span> : null}
           {ep.air_date ? <span>{ep.air_date.slice(0, 4)}</span> : null}
           {unaired && <span className="text-flare">Unaired</span>}
@@ -123,31 +121,26 @@ export default function EpisodePicker({
   const atStart = episode <= 1 && !prevSeason;
   const atEnd = !!count && episode >= count && !nextSeason;
 
-  const navBtn =
-    "flex items-center gap-1.5 border border-border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground transition-colors hover:border-acid hover:bg-acid hover:text-ink focus-visible:border-acid focus-visible:bg-acid focus-visible:text-ink disabled:opacity-35 disabled:pointer-events-none";
+  const navBtn = "btn-glass h-10 px-4 text-sm font-medium disabled:pointer-events-none disabled:opacity-35";
 
   return (
     <section className="space-y-3">
       <div className="flex items-center gap-3">
-        <span className="font-mono text-[11px] font-bold text-acid">EP</span>
-        <h2 className="font-display text-lg font-extrabold uppercase tracking-[-0.02em] text-bone">
-          Episodes
-        </h2>
-        <span className="h-px flex-1 bg-border" />
-        <div className="flex shrink-0 gap-px">
+        <h2 className="text-2xl font-bold text-white">Episodes</h2>
+        <div className="ml-auto flex shrink-0 gap-2">
           <button type="button" onClick={goPrev} disabled={atStart} className={navBtn}>
-            <ChevronLeft size={13} /> Prev
+            <ChevronLeft size={16} /> Prev
           </button>
           <button type="button" onClick={goNext} disabled={atEnd} className={navBtn}>
-            Next <ChevronRight size={13} />
+            Next <ChevronRight size={16} />
           </button>
         </div>
       </div>
 
       {/* Now playing line — replaces guessing from a bare number box */}
-      <p className="font-mono text-[11px] text-muted-foreground">
-        <span className="text-acid">
-          S{String(season).padStart(2, "0")}E{String(episode).padStart(2, "0")}
+      <p className="text-sm text-white/55">
+        <span className="font-semibold text-white">
+          S{season} · E{episode}
         </span>
         {current?.name ? ` · ${current.name}` : ""}
         {count ? ` · ${count} episodes this season` : ""}
@@ -155,7 +148,7 @@ export default function EpisodePicker({
 
       {/* Season rail */}
       {showSeasons && seasons.length > 1 && (
-        <div className="scrollbar-hide flex gap-px overflow-x-auto pb-1">
+        <div className="scrollbar-hide flex gap-2 overflow-x-auto pb-1">
           {seasons.map((s) => {
             const active = s.season_number === season;
             return (
@@ -163,14 +156,14 @@ export default function EpisodePicker({
                 key={s.id ?? s.season_number}
                 type="button"
                 onClick={() => onSelect(s.season_number, 1)}
-                className={`shrink-0 border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
+                className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                   active
-                    ? "border-acid bg-acid text-ink"
-                    : "border-border text-muted-foreground hover:border-acid hover:text-acid focus-visible:border-acid focus-visible:text-acid"
+                    ? "bg-white text-black"
+                    : "glass text-white/65 hover:text-white focus-visible:text-white"
                 }`}
               >
-                {s.season_number === 0 ? "Specials" : `S${s.season_number}`}
-                <span className={active ? "text-ink/60" : "text-muted-foreground/50"}>
+                {s.season_number === 0 ? "Specials" : `Season ${s.season_number}`}
+                <span className={active ? "text-black/50" : "text-white/40"}>
                   {" "}
                   {s.episode_count}
                 </span>
@@ -182,20 +175,20 @@ export default function EpisodePicker({
 
       {/* Episode list */}
       {isError ? (
-        <div className="border border-flare/40 bg-flare/5 px-4 py-3">
-          <span className="kicker text-flare">Reel Jammed</span>
-          <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+        <div className="rounded-xl border border-flare/40 bg-flare/10 px-4 py-3">
+          <span className="text-sm font-semibold text-red-300">Couldn't load episodes</span>
+          <p className="mt-1 text-[13px] text-white/60">
             Could not load this season's episodes. Use Prev/Next to move through them.
           </p>
         </div>
       ) : isLoading ? (
-        <div className="space-y-px">
+        <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-[68px] animate-pulse border border-border bg-card" />
+            <div key={i} className="h-[76px] animate-pulse rounded-xl bg-card" />
           ))}
         </div>
       ) : episodes.length > 0 ? (
-        <div className="scrollbar-hide max-h-[380px] space-y-px overflow-y-auto">
+        <div className="scrollbar-hide -mx-1 max-h-[440px] space-y-1 overflow-y-auto p-1">
           {episodes.map((ep) => (
             <EpisodeRow
               key={ep.id}
@@ -206,7 +199,7 @@ export default function EpisodePicker({
           ))}
         </div>
       ) : (
-        <p className="border border-dashed border-border px-4 py-6 text-center font-mono text-[11px] text-muted-foreground">
+        <p className="rounded-xl border border-dashed border-white/15 px-4 py-6 text-center text-sm text-white/50">
           No episode data for this season.
         </p>
       )}

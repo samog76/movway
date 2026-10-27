@@ -57,9 +57,85 @@ export interface Movie {
   media_type?: string;
   release_date?: string;
   first_air_date?: string;
+  genre_ids?: number[];
 }
 
 interface TmdbList { results: Movie[]; }
+
+/** Movie or series, read the way TMDB's mixed lists leave it. */
+export const mediaTypeOf = (m: Movie): "movie" | "tv" =>
+  m.media_type === "tv" || m.first_air_date || (m.name && !m.title) ? "tv" : "movie";
+
+/**
+ * TMDB's genre ids, which are stable. List endpoints carry ids only, and a
+ * request per genre list is not worth it for names that never change.
+ */
+const GENRE_NAMES: Record<number, string> = {
+  28: "Action", 12: "Adventure", 16: "Animation", 35: "Comedy", 80: "Crime",
+  99: "Documentary", 18: "Drama", 10751: "Family", 14: "Fantasy", 36: "History",
+  27: "Horror", 10402: "Music", 9648: "Mystery", 10749: "Romance",
+  878: "Science Fiction", 10770: "TV Movie", 53: "Thriller", 10752: "War", 37: "Western",
+  10759: "Action & Adventure", 10762: "Kids", 10763: "News", 10764: "Reality",
+  10765: "Sci-Fi & Fantasy", 10766: "Soap", 10767: "Talk", 10768: "War & Politics",
+};
+
+export const genreName = (id: number): string | undefined => GENRE_NAMES[id];
+
+export interface TmdbImage {
+  file_path: string;
+  iso_639_1: string | null;
+  vote_average: number;
+}
+
+/**
+ * The title's logo — the typeset title art studios publish — preferring
+ * English, then language-neutral, so a hero can show the film's own lettering
+ * rather than a font's approximation of it.
+ */
+export function pickLogo(logos: TmdbImage[] | undefined): string | null {
+  if (!logos?.length) return null;
+  const ranked = [...logos].sort((a, b) => b.vote_average - a.vote_average);
+  return (
+    ranked.find((l) => l.iso_639_1 === "en") ??
+    ranked.find((l) => !l.iso_639_1) ??
+    null
+  )?.file_path ?? null;
+}
+
+export const getLogo = async (type: "movie" | "tv", id: number): Promise<string | null> => {
+  const res = await tmdb<{ logos: TmdbImage[] }>(`/${type}/${id}/images`, {
+    include_image_language: "en,null",
+  });
+  return pickLogo(res.logos);
+};
+
+export interface StreamingService {
+  provider_id: number;
+  provider_name: string;
+  logo_path: string;
+  display_priority: number;
+}
+
+/** The services shown in the "Browse by service" strip, in display order. */
+export const FEATURED_SERVICES = [8, 9, 337, 350, 15, 1899, 2303, 386, 283, 43, 526];
+
+/** Logos come from TMDB rather than the bundle, the same as every poster. */
+export const getStreamingServices = async (): Promise<StreamingService[]> => {
+  const res = await tmdb<{ results: StreamingService[] }>("/watch/providers/movie", {
+    watch_region: "US",
+  });
+  const byId = new Map(res.results.map((p) => [p.provider_id, p]));
+  return FEATURED_SERVICES.map((id) => byId.get(id)).filter(
+    (p): p is StreamingService => !!p
+  );
+};
+
+export const getServiceTitles = (serviceId: number, type: "movie" | "tv") =>
+  tmdb<TmdbList>(`/discover/${type}`, {
+    with_watch_providers: String(serviceId),
+    watch_region: "US",
+    sort_by: "popularity.desc",
+  });
 
 export const getTrending = () => tmdb<TmdbList>("/trending/all/week");
 export const getTrendingMovies = () => tmdb<TmdbList>("/trending/movie/week");
@@ -71,10 +147,20 @@ export const getUpcoming = () => tmdb<TmdbList>("/movie/upcoming");
 export const searchMulti = (query: string) => tmdb<TmdbList>("/search/multi", { query });
 export const getAnime = () => tmdb<TmdbList>("/discover/tv", { with_genres: "16" });
 
-export interface MovieDetails extends Movie {
+interface DetailsExtras {
   genres: { id: number; name: string }[];
+  original_language?: string;
+  status?: string;
+  tagline?: string;
+  images?: { logos?: TmdbImage[] };
+  production_companies?: { id: number; name: string; logo_path: string | null }[];
+}
+
+export interface MovieDetails extends Movie, DetailsExtras {
   runtime: number;
   imdb_id: string | null;
+  budget?: number;
+  revenue?: number;
 }
 
 export interface SeasonSummary {
@@ -85,9 +171,12 @@ export interface SeasonSummary {
   poster_path: string | null;
 }
 
-export interface TVDetails extends Movie {
-  genres: { id: number; name: string }[];
+export interface TVDetails extends Movie, DetailsExtras {
   number_of_seasons: number;
+  number_of_episodes?: number;
+  episode_run_time?: number[];
+  last_air_date?: string;
+  created_by?: { id: number; name: string }[];
   seasons?: SeasonSummary[];
   external_ids?: { imdb_id: string | null };
 }
@@ -114,10 +203,11 @@ export interface SeasonDetails {
 export const getTVSeason = (id: number, season: number) =>
   tmdb<SeasonDetails>(`/tv/${id}/season/${season}`);
 
-export const getMovieDetails = (id: number) =>
-  tmdb<MovieDetails>(`/movie/${id}`, { append_to_response: "external_ids" });
-export const getTVDetails = (id: number) =>
-  tmdb<TVDetails>(`/tv/${id}`, { append_to_response: "external_ids" });
+/** Logos ride along with the details request rather than costing a second one. */
+const DETAILS_PARAMS = { append_to_response: "external_ids,images", include_image_language: "en,null" };
+
+export const getMovieDetails = (id: number) => tmdb<MovieDetails>(`/movie/${id}`, DETAILS_PARAMS);
+export const getTVDetails = (id: number) => tmdb<TVDetails>(`/tv/${id}`, DETAILS_PARAMS);
 
 export interface CastMember {
   id: number;
@@ -126,7 +216,10 @@ export interface CastMember {
   profile_path: string | null;
 }
 
-export interface Credits { cast: CastMember[] }
+export interface Credits {
+  cast: CastMember[];
+  crew?: { id: number; name: string; job: string }[];
+}
 
 export const getMovieCredits = (id: number) => tmdb<Credits>(`/movie/${id}/credits`);
 export const getTVCredits = (id: number) => tmdb<Credits>(`/tv/${id}/credits`);

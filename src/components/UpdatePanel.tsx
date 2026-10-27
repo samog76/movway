@@ -132,9 +132,9 @@ export default function UpdatePanel() {
   const busy = state.at === "checking" || state.at === "downloading";
 
   return (
-    <section className="reveal max-w-3xl space-y-4 border border-border bg-card p-5">
+    <section className="glass max-w-3xl space-y-4 rounded-2xl p-6">
       <div>
-        <h2 className="font-display text-lg font-extrabold uppercase tracking-tight text-bone">
+        <h2 className="text-xl font-semibold text-white">
           Updates
         </h2>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
@@ -143,13 +143,13 @@ export default function UpdatePanel() {
         </p>
       </div>
 
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border border-border bg-ink/50 px-3 py-2.5">
-        <span className="kicker text-muted-foreground">Installed</span>
-        <span className="font-mono text-sm font-bold tabular-nums text-acid">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-xl bg-black/30 px-4 py-3">
+        <span className="text-xs font-semibold text-muted-foreground">Installed</span>
+        <span className="text-sm font-bold tabular-nums text-acid">
           {installed.version}
         </span>
         {installed.versionCode > 0 && (
-          <span className="font-mono text-[10px] tabular-nums text-muted-foreground/70">
+          <span className="text-xs tabular-nums text-muted-foreground/70">
             build {installed.versionCode}
           </span>
         )}
@@ -157,25 +157,25 @@ export default function UpdatePanel() {
 
       {/* ── What the check found ── */}
       {state.at === "checking" && (
-        <p className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+        <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin" /> Looking for a newer build…
         </p>
       )}
 
       {state.at === "current" && (
-        <p className="flex items-center gap-2 font-mono text-[11px] text-acid">
+        <p className="flex items-center gap-2 text-[13px] text-acid">
           <CheckCircle2 className="h-3.5 w-3.5" /> This is the newest build.
         </p>
       )}
 
       {(state.at === "available" || state.at === "blocked") && (
-        <div className="border border-acid/50 bg-acid/5 px-3 py-2.5">
-          <p className="font-mono text-[11px] text-bone">
+        <div className="rounded-xl border border-white/15 bg-white/5 px-4 py-3">
+          <p className="text-[13px] text-bone">
             <span className="font-bold text-acid">{state.manifest.version}</span> is available
             {megabytes(state.manifest.size) && ` · ${megabytes(state.manifest.size)}`}
           </p>
           {state.at === "blocked" && (
-            <p className="mt-1.5 flex items-start gap-2 font-mono text-[10px] leading-relaxed text-flare">
+            <p className="mt-1.5 flex items-start gap-2 text-xs leading-relaxed text-flare">
               <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               Android needs your permission before Movway can install anything. Allow it once and
               come back — the switch is under this app in system settings.
@@ -186,13 +186,13 @@ export default function UpdatePanel() {
 
       {state.at === "downloading" && (
         <div className="space-y-1.5">
-          <p className="flex items-center gap-2 font-mono text-[11px] text-bone">
+          <p className="flex items-center gap-2 text-[13px] text-bone">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-acid" />
             {state.percent >= 0 ? `Downloading ${state.percent}%` : "Downloading…"}
           </p>
-          <div className="h-1 w-full max-w-md overflow-hidden bg-secondary">
+          <div className="h-1.5 w-full max-w-md overflow-hidden rounded-full bg-white/10">
             <div
-              className="h-full bg-acid [transition-duration:200ms] transition-[width]"
+              className="h-full rounded-full bg-white [transition-duration:200ms] transition-[width]"
               style={{ width: `${state.percent >= 0 ? state.percent : 8}%` }}
             />
           </div>
@@ -200,14 +200,14 @@ export default function UpdatePanel() {
       )}
 
       {state.at === "handing-over" && (
-        <p className="flex items-center gap-2 font-mono text-[11px] text-acid">
+        <p className="flex items-center gap-2 text-[13px] text-acid">
           <CheckCircle2 className="h-3.5 w-3.5" /> Downloaded. Android is asking you to confirm
           the install.
         </p>
       )}
 
       {state.at === "failed" && (
-        <p className="flex items-start gap-2 font-mono text-[11px] leading-relaxed text-flare">
+        <p className="flex items-start gap-2 text-[13px] leading-relaxed text-flare">
           <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {state.reason}
         </p>
       )}
@@ -219,7 +219,7 @@ export default function UpdatePanel() {
             type="button"
             onClick={() => void install(state.manifest)}
             data-tv-autofocus
-            className="inline-flex items-center gap-2 border-2 border-acid bg-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-ink transition-transform hover:-translate-y-0.5 focus-visible:-translate-y-0.5"
+            className="btn-play h-11 px-6 text-[15px]"
           >
             <ArrowDownToLine size={14} /> Update to {state.manifest.version}
           </button>
@@ -230,7 +230,7 @@ export default function UpdatePanel() {
             type="button"
             onClick={() => void allowInstalls(state.manifest)}
             data-tv-autofocus
-            className="border-2 border-flare px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-flare transition-transform hover:-translate-y-0.5 focus-visible:-translate-y-0.5"
+            className="btn-glass h-11 px-5 text-[15px] font-medium text-red-300"
           >
             Allow Movway to install
           </button>
@@ -240,7 +240,7 @@ export default function UpdatePanel() {
         {state.at === "available" && !isNative() && (
           <a
             href={state.manifest.apk}
-            className="inline-flex items-center gap-2 border-2 border-acid bg-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-ink transition-transform hover:-translate-y-0.5 focus-visible:-translate-y-0.5"
+            className="btn-play h-11 px-6 text-[15px]"
           >
             <ArrowDownToLine size={14} /> Download {state.manifest.version}
           </a>
@@ -250,20 +250,20 @@ export default function UpdatePanel() {
           type="button"
           onClick={() => void check()}
           disabled={busy}
-          className="border-2 border-border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-bone transition-colors hover:border-acid focus-visible:border-acid disabled:opacity-40"
+          className="btn-glass h-11 px-5 text-[15px] font-medium disabled:opacity-40"
         >
           Check again
         </button>
       </div>
 
       {/* ── Where it looks ── */}
-      <details className="border-t border-border pt-3">
-        <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/70">
+      <details className="border-t border-white/10 pt-4">
+        <summary className="cursor-pointer text-xs text-muted-foreground/70">
           Update source
         </summary>
         <div className="mt-3 space-y-2">
-          <label className="flex max-w-xl items-stretch border-2 border-border transition-colors focus-within:border-acid">
-            <span className="flex items-center bg-secondary px-3 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+          <label className="flex max-w-xl items-center gap-3 rounded-full border border-white/10 bg-black/30 px-5 transition-shadow focus-within:ring-2 focus-within:ring-white/70">
+            <span className="text-sm font-medium text-white/50">
               Manifest
             </span>
             <input
@@ -272,20 +272,20 @@ export default function UpdatePanel() {
               placeholder={DEFAULT_MANIFEST_URL}
               spellCheck={false}
               autoCapitalize="none"
-              className="min-w-0 flex-1 bg-card px-3 py-2.5 font-mono text-[11px] text-bone placeholder:text-muted-foreground/60 focus:outline-none"
+              className="min-w-0 flex-1 bg-transparent py-3 text-sm text-white placeholder:text-white/35 focus:outline-none"
             />
           </label>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={saveSource}
-              className="border-2 border-border px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-bone transition-colors hover:border-acid focus-visible:border-acid"
+              className="btn-glass h-10 px-4 text-sm font-medium"
             >
               Save source
             </button>
-            {sourceSaved && <span className="kicker text-acid">Saved</span>}
+            {sourceSaved && <span className="text-xs font-semibold text-acid">Saved</span>}
           </div>
-          <p className="font-mono text-[10px] leading-relaxed text-muted-foreground/70">
+          <p className="text-xs leading-relaxed text-muted-foreground/70">
             Empty means the published build. Point this somewhere else to take updates from your
             own deploy instead.
           </p>

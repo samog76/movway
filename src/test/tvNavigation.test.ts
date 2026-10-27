@@ -265,3 +265,125 @@ describe("seeding focus when nothing has it", () => {
     expect(inRail()).toBe(false);
   });
 });
+
+/**
+ * The glass navigation bar pinned to the top of the screen. It is `fixed`, so
+ * it stays at y≈24 however far the page has scrolled — which means, by plain
+ * geometry, it is "above" every control on screen and closer than a row that
+ * has scrolled out of view. Only the first row of a page may step into it.
+ */
+describe("D-pad and the top navigation bar", () => {
+  let nav: HTMLElement;
+  let navLinks: HTMLElement[];
+  let rows: HTMLElement[];
+
+  beforeEach(() => {
+    document.body.innerHTML = "";
+
+    nav = document.createElement("nav");
+    nav.setAttribute("data-focus-zone", "nav");
+    nav.setAttribute("data-focus-edge", "top");
+    place(nav, 860, 24, 530, 54);
+    document.body.appendChild(nav);
+    navLinks = ["Home", "Movies", "Series", "Search"].map((name, i) => {
+      const a = document.createElement("a");
+      a.href = "#";
+      a.textContent = name;
+      place(a, 870 + i * 125, 30, 110, 42);
+      nav.appendChild(a);
+      return a;
+    });
+
+    const main = document.createElement("main");
+    main.setAttribute("data-focus-zone", "main");
+    place(main, 0, 0, 1280, 720);
+    document.body.appendChild(main);
+    // Scrolled mid-page: the row above the first one on screen is off the top.
+    rows = ["row-offscreen", "row-a", "row-b"].map((name, i) => {
+      const b = document.createElement("button");
+      b.setAttribute("aria-label", name);
+      place(b, 64, -260 + i * 330, 200, 300);
+      main.appendChild(b);
+      return b;
+    });
+  });
+
+  const inNav = () => nav.contains(document.activeElement);
+
+  it("moves up a row mid-page rather than jumping into the bar", () => {
+    rows[1].focus();
+
+    press(UP);
+
+    expect(inNav(), `jumped into the bar from mid-page`).toBe(false);
+    expect(label()).toBe("row-offscreen");
+  });
+
+  it("enters the bar on up from the first row of the page", () => {
+    // Scrolled back to the top, as revealing the first row leaves it.
+    rows.forEach((r, i) => place(r, 64, 120 + i * 330, 200, 300));
+    rows[0].focus();
+
+    press(UP);
+
+    expect(inNav(), `expected the bar, got ${label()}`).toBe(true);
+  });
+
+  it("opens the bar on the section you are in", () => {
+    rows.forEach((r, i) => place(r, 64, 120 + i * 330, 200, 300));
+    navLinks[2].setAttribute("aria-current", "page");
+    rows[0].focus();
+
+    press(UP);
+
+    expect(label()).toBe("Series");
+  });
+
+  it("returns to the page on down", () => {
+    navLinks[1].focus();
+
+    press(DOWN);
+
+    expect(inNav()).toBe(false);
+    expect(document.activeElement?.closest("main")).not.toBeNull();
+  });
+
+  it("returns down to the page's landing control when it is on screen", () => {
+    rows.forEach((r, i) => place(r, 64 + i * 400, 120, 200, 300));
+    rows[0].setAttribute("data-tv-autofocus", "");
+    navLinks[2].focus(); // far to the right of the landing control
+
+    press(DOWN);
+
+    expect(label()).toBe("row-offscreen");
+  });
+
+  it("keeps left and right inside the bar, and walls them at its ends", () => {
+    navLinks[0].focus();
+
+    press(RIGHT);
+    expect(label()).toBe("Movies");
+
+    navLinks[0].focus();
+    const ev = press(LEFT);
+    expect(label()).toBe("Home");
+    expect(ev.defaultPrevented).toBe(true);
+  });
+
+  it("never enters the bar sideways from the page", () => {
+    rows[1].focus();
+
+    press(RIGHT);
+
+    expect(inNav()).toBe(false);
+  });
+
+  it("is never where focus is seeded", async () => {
+    const tv = await import("@/lib/tv");
+    rows.forEach((r) => r.remove());
+    (document.activeElement as HTMLElement | null)?.blur?.();
+
+    expect(tv.focusFirstInMain()).toBe(false);
+    expect(inNav()).toBe(false);
+  });
+});

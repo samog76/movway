@@ -11,62 +11,39 @@ import {
   Movie,
 } from "@/lib/tmdb";
 import { getContinueWatching, removeWatchEntry, WatchEntry } from "@/lib/continueWatching";
-import HeroSection from "@/components/HeroSection";
-import ContentRow from "@/components/ContentRow";
+import { useMyList } from "@/hooks/useMyList";
+import HeroSection, { HeroSkeleton } from "@/components/HeroSection";
+import ContentRow, { ROW_INSET, RowSkeleton } from "@/components/ContentRow";
+import ServiceStrip from "@/components/ServiceStrip";
 import FaultReport from "@/components/FaultReport";
 
-function RowSkeleton() {
-  return (
-    <div className="space-y-4">
-      <div className="h-5 w-48 animate-pulse bg-card" />
-      <div className="flex gap-3 md:gap-4">
-        {Array.from({ length: 7 }).map((_, i) => (
-          <div
-            key={i}
-            className="aspect-[2/3] w-[132px] shrink-0 animate-pulse border border-border bg-card md:w-[176px]"
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
+const FEATURED = 8;
 
-function RowError({ label, error }: { label: string; error: unknown }) {
-  return <FaultReport title={`Reel jammed · ${label}`} error={error} compact />;
-}
+/** "S2 · E5" over the art, so a series shows where it was left. */
+const episodeBadge = (item: Movie) => {
+  const e = item as WatchEntry;
+  return e.media_type === "tv" && e.season && e.episode ? `S${e.season} · E${e.episode}` : undefined;
+};
 
 export default function HomePage() {
-  const { data: trending, isError: trendingError, error: trendingErr } = useQuery({
-    queryKey: ["trending"],
-    queryFn: getTrending,
-    refetchInterval: 5 * 60 * 1000,
-  });
-  const {
-    data: trendingMovies,
-    isError: trendingMoviesError,
-    error: trendingMoviesErr,
-  } = useQuery({
-    queryKey: ["trendingMovies"],
-    queryFn: getTrendingMovies,
-    refetchInterval: 5 * 60 * 1000,
-  });
-  const { data: trendingTV, isError: trendingTVError, error: trendingTVErr } = useQuery({
-    queryKey: ["trendingTV"],
-    queryFn: getTrendingTV,
-    refetchInterval: 5 * 60 * 1000,
-  });
+  const refresh = { refetchInterval: 5 * 60 * 1000 };
+  const trending = useQuery({ queryKey: ["trending"], queryFn: getTrending, ...refresh });
+  const trendingMovies = useQuery({ queryKey: ["trendingMovies"], queryFn: getTrendingMovies, ...refresh });
+  const trendingTV = useQuery({ queryKey: ["trendingTV"], queryFn: getTrendingTV, ...refresh });
   const { data: popular } = useQuery({ queryKey: ["popular"], queryFn: getPopularMovies });
-  const { data: topRated } = useQuery({ queryKey: ["topRated"], queryFn: getTopRated });
   const { data: tv } = useQuery({ queryKey: ["popularTV"], queryFn: getPopularTV });
+  const { data: topRated } = useQuery({ queryKey: ["topRated"], queryFn: getTopRated });
   const { data: upcoming } = useQuery({ queryKey: ["upcoming"], queryFn: getUpcoming });
+  const myList = useMyList();
 
   const [continueWatching, setContinueWatching] = useState<WatchEntry[]>([]);
 
   useEffect(() => {
-    const sorted = getContinueWatching()
-      .sort((a, b) => b.updatedAt - a.updatedAt)
-      .slice(0, 8);
-    setContinueWatching(sorted);
+    setContinueWatching(
+      getContinueWatching()
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .slice(0, 12)
+    );
   }, []);
 
   const handleDeleteContinueWatching = (item: WatchEntry) => {
@@ -76,63 +53,76 @@ export default function HomePage() {
     );
   };
 
-  const hero = trending?.results?.[0] ?? null;
+  const featured = (trending.data?.results ?? [])
+    .filter((m) => m.backdrop_path && (m.media_type === "movie" || m.media_type === "tv"))
+    .slice(0, FEATURED);
 
-  // Sections are numbered in the order they actually render.
-  const sections: { title: string; items: Movie[] }[] = [];
-  if (trendingMovies?.results?.length)
-    sections.push({ title: "Trending Films", items: trendingMovies.results.slice(0, 12) });
-  if (trendingTV?.results?.length)
-    sections.push({ title: "Trending Series", items: trendingTV.results.slice(0, 12) });
-  if (popular?.results?.length)
-    sections.push({ title: "Popular Films", items: popular.results.slice(0, 12) });
-  if (tv?.results?.length)
-    sections.push({ title: "Popular Series", items: tv.results.slice(0, 12) });
-  if (topRated?.results?.length)
-    sections.push({ title: "Top Rated", items: topRated.results.slice(0, 12) });
-  if (upcoming?.results?.length)
-    sections.push({ title: "Coming Soon", items: upcoming.results.slice(0, 12) });
-
-  const continueOffset = continueWatching.length > 0 ? 1 : 0;
+  const sections: { title: string; items: Movie[]; viewAll?: string }[] = [];
+  const add = (title: string, list: Movie[] | undefined, viewAll?: string) => {
+    if (list?.length) sections.push({ title, items: list.slice(0, 20), viewAll });
+  };
+  add("Trending Movies", trendingMovies.data?.results, "/browse/trending-movie");
+  add("Trending Series", trendingTV.data?.results, "/browse/trending-tv");
+  add("Popular Movies", popular?.results, "/browse/movie");
+  add("Popular Series", tv?.results, "/browse/tv");
+  add("Top Rated", topRated?.results);
+  add("Coming Soon", upcoming?.results);
 
   return (
-    <div className="space-y-12 md:space-y-16">
-      {trendingError ? (
-        <FaultReport title="Projector fault" error={trendingErr} />
+    <div className="pb-6">
+      {trending.isError ? (
+        <div className={`tv-safe pt-[var(--nav-h)] ${ROW_INSET}`}>
+          <FaultReport title="Could not load featured titles" error={trending.error} />
+        </div>
+      ) : featured.length ? (
+        <HeroSection items={featured} />
+      ) : trending.isSuccess ? (
+        <div className="h-[var(--nav-h)]" />
       ) : (
-        <HeroSection movie={hero} />
+        <HeroSkeleton />
       )}
 
-      {continueWatching.length > 0 && (
-        <div style={{ animationDelay: "80ms" }}>
-          <ContentRow
-            index={1}
-            title="Continue Watching"
-            items={continueWatching}
-            showDelete
-            onDelete={(item) => handleDeleteContinueWatching(item as WatchEntry)}
-          />
-        </div>
-      )}
-
-      {trendingMoviesError && <RowError label="trending films" error={trendingMoviesErr} />}
-      {trendingTVError && <RowError label="trending series" error={trendingTVErr} />}
-
-      {!trendingMovies && !trendingMoviesError && <RowSkeleton />}
-      {!trendingTV && !trendingTVError && <RowSkeleton />}
-
-      {sections.map((section, i) => (
+      {/* Rows rise into the bottom of the hero, the way the art fades out.
+          They wait for the hero: on a TV the remote is seeded into the first
+          control on screen, and that should be Play, not whichever row's
+          request happened to finish first. */}
+      {(trending.isSuccess || trending.isError) && (
         <div
-          key={section.title}
-          style={{ animationDelay: `${Math.min((i + continueOffset) * 70, 350)}ms` }}
+          className={`home-rows relative z-10 space-y-10 md:space-y-12 ${featured.length ? "-mt-16 md:-mt-24" : ""}`}
         >
-          <ContentRow
-            index={i + 1 + continueOffset}
-            title={section.title}
-            items={section.items}
-          />
+          <ServiceStrip />
+
+          {continueWatching.length > 0 && (
+            <ContentRow
+              title="Continue Watching"
+              items={continueWatching}
+              showDelete
+              onDelete={(item) => handleDeleteContinueWatching(item as WatchEntry)}
+              badgeFor={episodeBadge}
+            />
+          )}
+
+          {myList.length > 0 && <ContentRow title="My List" items={myList} viewAll="/list" />}
+
+          {trendingMovies.isError && (
+            <div className={`tv-safe ${ROW_INSET}`}>
+              <FaultReport title="Trending movies" error={trendingMovies.error} compact />
+            </div>
+          )}
+          {trendingTV.isError && (
+            <div className={`tv-safe ${ROW_INSET}`}>
+              <FaultReport title="Trending series" error={trendingTV.error} compact />
+            </div>
+          )}
+
+          {!trendingMovies.data && !trendingMovies.isError && <RowSkeleton />}
+          {!trendingTV.data && !trendingTV.isError && <RowSkeleton />}
+
+          {sections.map((s) => (
+            <ContentRow key={s.title} title={s.title} items={s.items} viewAll={s.viewAll} />
+          ))}
         </div>
-      ))}
+      )}
     </div>
   );
 }

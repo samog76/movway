@@ -18,9 +18,12 @@ The TV build is the one that matters. Almost every hard problem in this project 
 that context: a D-pad instead of a pointer, a WebView instead of a browser, and a ten-foot
 interface instead of a desktop one.
 
-The interface has a deliberate visual identity — film-black ground, marquee-lime accent,
-Bricolage Grotesque over Manrope with JetBrains Mono for data. That design is settled and
-shouldn't be re-litigated without reason.
+The interface follows cinejoy.pk's layout, at the owner's request: a deep green-black ground
+(`#04120B`), a full-bleed rotating hero that shows each title's own logo art, a frosted-glass
+pill navigation, white pill actions, rounded poster rows and Inter throughout, with yellow
+kept for ratings. Only the look is borrowed. The wordmark, copy and artwork are Movway's or
+come from TMDB. Tokens live in `src/index.css`; the `.glass`, `.btn-play` and `.btn-glass`
+classes there are the building blocks.
 
 ---
 
@@ -157,6 +160,7 @@ and Deno edge functions, not a long-running Node server.
 | Path | What it does |
 |---|---|
 | `src/lib/tv.ts` | The D-pad. Geometric focus walker with zones, key-code translation for real remote hardware, focus seeding. The most subtle file in the project. |
+| `src/components/TopNav.tsx` | Glass navigation bar, the phone tab bar, and Back handling while the remote is in the bar. |
 | `src/lib/omss.ts` | Client for the streaming backend. Fetches sources, resolves proxy paths, ranks sources, flags addresses the packaged app can't reach. |
 | `src/components/NativePlayer.tsx` | Movway's own player: `<video>` + hls.js, controls that genuinely work, falls through to the next source on failure. |
 | `src/lib/providers.ts` | The two embed providers, VidLink and VidCore, and their URL builders. |
@@ -173,9 +177,13 @@ and Deno edge functions, not a long-running Node server.
 
 ## 6. How the remote works
 
-- **Focus zones.** The rail and the page are separate zones. *Up and down never leave their
-  zone* — you step into the menu with Left and out with Right. Without that, geometry sent
-  focus into the off-canvas sidebar on every downward press.
+- **Focus zones.** The navigation bar and the page are separate zones. The bar is marked
+  `data-focus-edge="top"`: Up enters it only from the first row of a page, landing on the
+  current section, and Down returns to the page's landing control (Play, the player). Left
+  and Right never cross into or out of it. The bar is `fixed`, so mid-page it is
+  geometrically "above" everything; without the zone rule, Up from any row whose neighbour
+  had scrolled off screen would jump into the menu. The walker still supports a side `rail`
+  zone, which the tests exercise, though no screen uses one now.
 
 - **Off-axis scoring.** Vertical moves score horizontal *overlap*, not centre distance.
   Centre distance punishes an element for being wide, which made the full-width player cost
@@ -353,8 +361,10 @@ bash /home/user/movway/scripts/setup-rea.sh
 ```
 
 Measured working: `rea inspect-android-package download-site/movway.apk` reads
-the package through JADX. The static JavaScript analyser is slow on the 1 MB
-minified bundle inside the APK, so give it a long deadline.
+the package through JADX. The static JavaScript analyser did **not** finish the 1 MB
+minified bundle inside the APK: it hit its default 5-minute deadline, and again at 20
+minutes with a 4 GB worker heap. Read Movway's own logic from `src/`; save REA's
+JavaScript analysis for smaller third-party scripts.
 
 ## 9. Worth doing after the backend is up
 
@@ -364,7 +374,7 @@ minified bundle inside the APK, so give it a long deadline.
   converted, so those titles show no subtitle option.
 - **Resume position isn't stored.** `continueWatching` keeps season and episode but not a
   timestamp; the native player now knows real positions, so this is newly possible.
-- **Watchlist and History are dead routes.** They're in the sidebar and render a
-  "coming soon" placard.
+- **History has no screen.** My List now exists (`src/lib/myList.ts`, `/list`), saved on
+  the device like Continue Watching; a viewing history page does not.
 - **Quality switching reloads the stream.** It swaps the source rather than using the HLS
   variant ladder, so it restarts from position zero.

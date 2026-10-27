@@ -11,6 +11,7 @@ import SearchPage from "./pages/SearchPage";
 import WatchPage from "./pages/WatchPage";
 import BrowsePage from "./pages/BrowsePage";
 import SettingsPage from "./pages/SettingsPage";
+import MyListPage from "./pages/MyListPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,7 +38,8 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/search" element={<AppLayout><SearchPage /></AppLayout>} />
-          <Route path="/watch/:type/:id" element={<AppLayout><WatchPage /></AppLayout>} />
+          <Route path="/watch/:type/:id" element={<AppLayout bleed><WatchPage /></AppLayout>} />
+          <Route path="/list" element={<AppLayout><MyListPage /></AppLayout>} />
           <Route path="/browse/:category" element={<AppLayout><BrowsePage /></AppLayout>} />
           <Route path="/settings" element={<AppLayout><SettingsPage /></AppLayout>} />
           <Route path="*" element={<NotFound />} />

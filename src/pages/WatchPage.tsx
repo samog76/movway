@@ -6,6 +6,9 @@ import {
   getMovieCredits,
   getTVCredits,
   img,
+  backdrop,
+  mediaTypeOf,
+  pickLogo,
   type MovieDetails,
   type TVDetails,
 } from "@/lib/tmdb";
@@ -25,10 +28,12 @@ import { fetchEpisodeSources, fetchMovieSources, loadBackendUrl } from "@/lib/om
 import EpisodePicker from "@/components/EpisodePicker";
 import EmbedPlayer from "@/components/EmbedPlayer";
 import { useEmbedPlayback } from "@/hooks/useEmbedPlayback";
-import { ArrowLeft, Star } from "lucide-react";
+import { Star } from "lucide-react";
+import { TitleArt } from "@/components/HeroSection";
+import MyListButton from "@/components/MyListButton";
 import { useState, useEffect, useMemo, useRef, useCallback, ReactNode } from "react";
 
-/** A bordered control slab — the only form idiom in this UI. */
+/** A labelled glass pill around a native select. */
 function Control({
   label,
   children,
@@ -39,17 +44,39 @@ function Control({
   hint?: string;
 }) {
   return (
-    <label className="group flex items-stretch border border-border transition-colors focus-within:border-acid" title={hint}>
-      <span className="flex items-center bg-secondary px-3 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-        {label}
-      </span>
+    <label
+      className="glass flex items-center gap-2 rounded-full pl-4 pr-2 transition-shadow focus-within:ring-2 focus-within:ring-white/70"
+      title={hint}
+    >
+      <span className="text-sm font-medium text-white/50">{label}</span>
       {children}
     </label>
   );
 }
 
 const selectClass =
-  "bg-card px-3 py-2 font-mono text-[11px] uppercase tracking-[0.08em] text-bone focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed";
+  "cursor-pointer rounded-full bg-transparent py-2.5 pr-2 text-sm font-medium text-white focus:outline-none disabled:cursor-not-allowed disabled:opacity-40 [&>option]:bg-[hsl(var(--popover))]";
+
+const formatRuntime = (min: number) => (min >= 60 ? `${Math.floor(min / 60)}h ${min % 60}m` : `${min}m`);
+
+const formatMoney = (n?: number) =>
+  n ? n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }) : undefined;
+
+const formatDate = (iso?: string) =>
+  iso ? new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : undefined;
+
+function languageName(code?: string): string | undefined {
+  if (!code) return undefined;
+  try {
+    return new Intl.DisplayNames(["en"], { type: "language" }).of(code) ?? code.toUpperCase();
+  } catch {
+    return code.toUpperCase();
+  }
+}
+
+/** "Ends 9:42 PM": when it would finish if started now. */
+const endsAt = (min: number) =>
+  new Date(Date.now() + min * 60_000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
 export default function WatchPage() {
   const { type, id } = useParams<{ type: string; id: string }>();
@@ -212,186 +239,266 @@ export default function WatchPage() {
 
 
 
+  const runtime =
+    movie && "runtime" in movie && movie.runtime
+      ? movie.runtime
+      : movie && "episode_run_time" in movie
+        ? movie.episode_run_time?.[0]
+        : undefined;
+  const logoPath = pickLogo(movie?.images?.logos);
+  const credit = isTV
+    ? (movie && "created_by" in movie ? movie.created_by : undefined)?.map((c) => c.name).slice(0, 2).join(", ")
+    : credits?.crew?.filter((c) => c.job === "Director").map((c) => c.name).slice(0, 2).join(", ");
+
+  const facts: [string, ReactNode][] = [];
+  if (movie) {
+    if (runtime)
+      facts.push([
+        isTV ? "Episode length" : "Runtime",
+        <>
+          {formatRuntime(runtime)}
+          {!isTV && <span className="text-white/40"> · Ends {endsAt(runtime)}</span>}
+        </>,
+      ]);
+    const lang = languageName(movie.original_language);
+    if (lang) facts.push(["Language", lang]);
+    if (isTV) {
+      if ("number_of_seasons" in movie && movie.number_of_seasons) facts.push(["Seasons", movie.number_of_seasons]);
+      if ("number_of_episodes" in movie && movie.number_of_episodes) facts.push(["Episodes", movie.number_of_episodes]);
+      const first = formatDate(movie.first_air_date);
+      if (first) facts.push(["First aired", first]);
+      if (movie.status) facts.push(["Status", movie.status]);
+    } else {
+      const released = formatDate(movie.release_date);
+      if (released) facts.push(["Release date", released]);
+      const budget = formatMoney("budget" in movie ? movie.budget : undefined);
+      if (budget) facts.push(["Budget", budget]);
+      const revenue = formatMoney("revenue" in movie ? movie.revenue : undefined);
+      if (revenue) facts.push(["Revenue", revenue]);
+    }
+  }
+  const studios = (movie?.production_companies ?? []).filter((c) => c.logo_path).slice(0, 3);
+
   return (
-    <div className="space-y-8">
-      <Link
-        to="/"
-        className="inline-flex items-center gap-2 border border-border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:border-acid focus-visible:border-acid hover:bg-acid focus-visible:bg-acid hover:text-ink focus-visible:text-ink"
-      >
-        <ArrowLeft size={13} /> Back to Lobby
-      </Link>
-
-      {/* ── Projector ── */}
-      <div className="reveal border border-border bg-card">
-        {/* Slate bar */}
-        <div className="flex items-center gap-3 border-b border-border px-3 py-2">
-          <span className="flex gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-flare" />
-            <span className="h-2 w-2 rounded-full bg-acid animate-flicker" />
-            <span className="h-2 w-2 rounded-full bg-violet" />
-          </span>
-          <span className="kicker text-muted-foreground">
-            Now Playing
-          </span>
-          <span className="ml-auto truncate font-mono text-[10px] uppercase tracking-[0.14em] text-acid">
-            {useNativePlayer ? streams?.sources[0]?.provider?.name ?? "Direct" : provider.name}
-            {isTV && ` · S${season}E${episode}`}
-          </span>
+    <div className="relative">
+      {/* ── Backdrop: the title's art behind everything, fading into the ground ── */}
+      {movie?.backdrop_path && (
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[90vh] overflow-hidden">
+          <img src={backdrop(movie.backdrop_path)} alt="" className="h-full w-full animate-hero-fade object-cover object-top opacity-60" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-background/20" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-transparent to-transparent" />
         </div>
+      )}
 
-        {useNativePlayer ? (
-          <NativePlayer
-            sources={playableStreams}
-            subtitles={streams?.subtitles ?? []}
-            title={title}
-            onPrevEpisode={isTV && episode > 1 ? () => selectEpisode(season, episode - 1) : undefined}
-            onNextEpisode={isTV ? () => selectEpisode(season, episode + 1) : undefined}
-            onUnplayable={setNativeUnplayable}
-          />
-        ) : (
-          <EmbedPlayer
-            embedUrl={embedUrl}
-            frameKey={resetKey}
-            title={title}
-            iframeRef={iframeRef}
-            provider={provider}
-            playback={playback}
-            onNotResponding={onNotResponding}
-            lastResort={sourcePickedByHand || nextProviderId(provider.id) === null}
-          />
-        )}
-      </div>
+      <div className="tv-safe relative space-y-10 px-4 pb-6 pt-[var(--nav-h)] md:px-12 lg:px-16">
+        {/* ── Player ── */}
+        <div className="mx-auto max-w-[1400px] space-y-3">
+          <div className="overflow-hidden rounded-2xl bg-black shadow-2xl shadow-black/60 ring-1 ring-white/10">
+            {useNativePlayer ? (
+              <NativePlayer
+                sources={playableStreams}
+                subtitles={streams?.subtitles ?? []}
+                title={title}
+                onPrevEpisode={isTV && episode > 1 ? () => selectEpisode(season, episode - 1) : undefined}
+                onNextEpisode={isTV ? () => selectEpisode(season, episode + 1) : undefined}
+                onUnplayable={setNativeUnplayable}
+              />
+            ) : (
+              <EmbedPlayer
+                embedUrl={embedUrl}
+                frameKey={resetKey}
+                title={title}
+                iframeRef={iframeRef}
+                provider={provider}
+                playback={playback}
+                onNotResponding={onNotResponding}
+                lastResort={sourcePickedByHand || nextProviderId(provider.id) === null}
+              />
+            )}
+          </div>
 
-      {/* ── Controls ── */}
-      <div className="flex flex-wrap items-center gap-2.5">
-        <Control label="Source">
-          <select
-            value={provider.id}
-            onChange={(e) => handleProviderChange(e.target.value)}
-            className={selectClass}
-          >
-            {VIDEO_PROVIDERS.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </Control>
+          {/* ── Source and subtitles ── */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Control label="Source">
+              <select
+                value={provider.id}
+                onChange={(e) => handleProviderChange(e.target.value)}
+                className={selectClass}
+              >
+                {VIDEO_PROVIDERS.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </Control>
 
-        <Control
-          label="Subs"
-          hint={provider.supportsSubtitles ? undefined : "This source doesn't support default subtitles"}
-        >
-          <select
-            value={subtitle}
-            onChange={(e) => handleSubtitleChange(e.target.value)}
-            disabled={!provider.supportsSubtitles}
-            className={selectClass}
-          >
-            {SUBTITLE_LANGUAGES.map((lang) => (
-              <option key={lang.code} value={lang.code}>
-                {lang.label}
-              </option>
-            ))}
-          </select>
-        </Control>
+            <Control
+              label="Subtitles"
+              hint={provider.supportsSubtitles ? undefined : "This source doesn't support default subtitles"}
+            >
+              <select
+                value={subtitle}
+                onChange={(e) => handleSubtitleChange(e.target.value)}
+                disabled={!provider.supportsSubtitles}
+                className={selectClass}
+              >
+                {SUBTITLE_LANGUAGES.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.label}
+                  </option>
+                ))}
+              </select>
+            </Control>
 
-        {!provider.supportsSubtitles && (
-          <span className="font-mono text-[10px] text-muted-foreground">
-            Use the player's own subtitle menu for this source.
-          </span>
-        )}
-      </div>
-
-      {/* ── Title card ── */}
-      {movie && (
-        <div className="space-y-4">
-          <h1 className="font-display font-variation-tight max-w-4xl text-[clamp(1.75rem,5vw,3.75rem)] font-extrabold uppercase leading-[0.9] tracking-[-0.05em] text-bone">
-            {title}
-          </h1>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="flex items-center gap-1.5 bg-acid px-2 py-1 font-mono text-[10px] font-bold tabular-nums text-ink">
-              <Star size={10} fill="currentColor" />
-              {movie.vote_average ? movie.vote_average.toFixed(1) : "—"}
+            <span className="ml-auto text-sm text-white/45">
+              {useNativePlayer ? streams?.sources[0]?.provider?.name ?? "Direct" : provider.name}
+              {isTV && ` · S${season} · E${episode}`}
             </span>
-            {year && (
-              <span className="border border-border px-2 py-1 font-mono text-[10px] tabular-nums text-muted-foreground">
-                {year}
+
+            {!provider.supportsSubtitles && (
+              <span className="w-full text-xs text-white/45">
+                Use the player's own subtitle menu for this source.
               </span>
             )}
-            {"runtime" in movie && movie.runtime ? (
-              <span className="border border-border px-2 py-1 font-mono text-[10px] tabular-nums text-muted-foreground">
-                {movie.runtime} MIN
-              </span>
-            ) : null}
-            {movie.genres?.map((g) => (
-              <span
-                key={g.id}
-                className="border border-border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground"
-              >
-                {g.name}
-              </span>
-            ))}
           </div>
-
-          <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">{movie.overview}</p>
         </div>
-      )}
 
-      {/* ── Episodes ── */}
-      {isTV && seasons.length > 0 && (
-        <EpisodePicker
-          tmdbId={tmdbId}
-          seasons={seasons}
-          season={season}
-          episode={episode}
-          showSeasons={!isAnime}
-          onSelect={selectEpisode}
-        />
-      )}
+        {/* ── Title ── */}
+        {movie && (
+          <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_21rem]">
+            <div className="space-y-5">
+              <TitleArt logoPath={logoPath} title={title} className="object-left" />
 
-      {/* ── Cast ── */}
-      {cast.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <span className="font-mono text-[11px] font-bold text-acid">CR</span>
-            <h2 className="font-display text-lg font-extrabold uppercase tracking-[-0.02em] text-bone">
-              Cast
-            </h2>
-            <span className="h-px flex-1 bg-border" />
-          </div>
+              {movie.genres?.length ? (
+                <p className="flex flex-wrap items-center gap-x-3 text-lg font-medium text-white/90">
+                  {movie.genres.map((g, i) => (
+                    <span key={g.id} className="flex items-center gap-3">
+                      {i > 0 && <span aria-hidden className="h-1 w-1 rounded-full bg-white/40" />}
+                      {g.name}
+                    </span>
+                  ))}
+                </p>
+              ) : null}
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {cast.map((member) => (
-              <div
-                key={member.id}
-                className="flex items-center gap-3 border border-border bg-card p-2 transition-colors hover:border-acid focus-visible:border-acid"
-              >
-                {member.profile_path ? (
-                  <img
-                    src={img(member.profile_path, "w92")}
-                    alt={member.name}
-                    className="h-11 w-11 shrink-0 object-cover grayscale transition-all duration-300 hover:grayscale-0 focus-visible:grayscale-0"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center bg-secondary font-mono text-xs text-muted-foreground">
-                    {member.name.charAt(0)}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-lg font-medium text-white/90">
+                {year && <span>{year}</span>}
+                {runtime ? <span>{formatRuntime(runtime)}</span> : null}
+                {isTV && "number_of_seasons" in movie && movie.number_of_seasons ? (
+                  <span className="tag">{movie.number_of_seasons} {movie.number_of_seasons === 1 ? "season" : "seasons"}</span>
+                ) : null}
+                {movie.vote_average ? (
+                  <span className="flex items-center gap-1.5">
+                    <Star size={18} className="fill-acid text-acid" />
+                    {movie.vote_average.toFixed(1)}
+                  </span>
+                ) : null}
+                <MyListButton item={{ ...movie, media_type: mediaTypeOf(movie) }} className="h-10 w-10 min-w-0" />
+              </div>
+
+              {credit && (
+                <p className="text-[17px] text-white/90">
+                  <span className="text-white/45">{isTV ? "Created by" : "Director"}:</span> {credit}
+                </p>
+              )}
+
+              <Overview text={movie.overview} />
+            </div>
+
+            {facts.length > 0 && (
+              <aside className="space-y-6 self-start">
+                <dl className="glass overflow-hidden rounded-xl text-sm">
+                  {facts.map(([label, value], i) => (
+                    <div key={label} className={`flex items-center justify-between gap-4 px-4 py-3 ${i ? "border-t border-white/[0.06]" : ""}`}>
+                      <dt className="text-white/50">{label}</dt>
+                      <dd className="text-right font-medium text-white">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                {/* Studio marks, white on the ground. Some logos ship with an
+                    opaque white background; inverted and screened, that
+                    background turns black and drops out instead of leaving a
+                    grey slab. */}
+                {studios.length > 0 && (
+                  <div className="flex items-center justify-around gap-6 px-2">
+                    {studios.map((c) => (
+                      <img
+                        key={c.id}
+                        src={img(c.logo_path, "w185")}
+                        alt={c.name}
+                        title={c.name}
+                        className="max-h-9 max-w-[7rem] object-contain opacity-80 mix-blend-screen contrast-125 grayscale invert"
+                        loading="lazy"
+                      />
+                    ))}
                   </div>
                 )}
-                <div className="min-w-0">
-                  <p className="truncate font-mono text-[11px] uppercase tracking-[0.08em] text-bone">
-                    {member.name}
-                  </p>
+              </aside>
+            )}
+          </div>
+        )}
+
+        {/* ── Episodes ── */}
+        {isTV && seasons.length > 0 && (
+          <EpisodePicker
+            tmdbId={tmdbId}
+            seasons={seasons}
+            season={season}
+            episode={episode}
+            showSeasons={!isAnime}
+            onSelect={selectEpisode}
+          />
+        )}
+
+        {/* ── Cast ── */}
+        {cast.length > 0 && (
+          <section className="space-y-5">
+            <h2 className="text-2xl font-bold text-white">Cast</h2>
+            <div className="scrollbar-hide -mx-4 flex gap-5 overflow-x-auto px-4 pb-2 md:-mx-0 md:px-0">
+              {cast.map((member) => (
+                <div key={member.id} className="w-[7.5rem] shrink-0 text-center">
+                  {member.profile_path ? (
+                    <img
+                      src={img(member.profile_path, "w185")}
+                      alt=""
+                      className="mx-auto aspect-square w-full rounded-full object-cover shadow-lg shadow-black/40 ring-1 ring-white/10"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="mx-auto flex aspect-square w-full items-center justify-center rounded-full bg-card text-2xl font-semibold text-white/50">
+                      {member.name.charAt(0)}
+                    </div>
+                  )}
+                  <p className="mt-3 line-clamp-2 text-sm font-semibold text-white">{member.name}</p>
                   {member.character && (
-                    <p className="truncate text-[11px] text-muted-foreground">{member.character}</p>
+                    <p className="mt-0.5 line-clamp-2 text-xs text-white/50">{member.character}</p>
                   )}
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Overview clamped to three lines, with "Read more" when it runs longer. */
+function Overview({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  if (!text) return null;
+  const long = text.length > 240;
+  return (
+    <div className="max-w-[44rem]">
+      <p className={`text-[17px] leading-7 text-white/80 ${open || !long ? "" : "line-clamp-3"}`}>{text}</p>
+      {long && (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="mt-1.5 rounded text-sm font-semibold text-white/60 hover:text-white focus-visible:text-white"
+        >
+          {open ? "Show less" : "Read more"}
+        </button>
       )}
     </div>
   );

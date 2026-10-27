@@ -1,15 +1,19 @@
+import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { Film } from "lucide-react";
 import {
   getPopularMovies,
   getPopularTV,
   getAnime,
   getTrendingMovies,
   getTrendingTV,
+  getServiceTitles,
+  getStreamingServices,
   Movie,
 } from "@/lib/tmdb";
 import { PosterCard } from "@/components/ContentRow";
-import PageHeader from "@/components/PageHeader";
+import PageHeader, { POSTER_GRID } from "@/components/PageHeader";
 
 interface CategoryConfig {
   label: string;
@@ -21,39 +25,101 @@ const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
   movie: { label: "Movies", queryKey: "browse-movie", fetcher: getPopularMovies },
   tv: { label: "Series", queryKey: "browse-tv", fetcher: getPopularTV },
   anime: { label: "Anime", queryKey: "browse-anime", fetcher: getAnime },
-  "trending-movie": {
-    label: "Trending Movies",
-    queryKey: "browse-trending-movie",
-    fetcher: getTrendingMovies,
-  },
-  "trending-tv": {
-    label: "Trending Series",
-    queryKey: "browse-trending-tv",
-    fetcher: getTrendingTV,
-  },
+  "trending-movie": { label: "Trending Movies", queryKey: "browse-trending-movie", fetcher: getTrendingMovies },
+  "trending-tv": { label: "Trending Series", queryKey: "browse-trending-tv", fetcher: getTrendingTV },
 };
 
-const GRID =
-  "grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 md:gap-4 lg:grid-cols-5 xl:grid-cols-6";
-
-/** Shared empty/error state — a blank film frame with a mono caption. */
-function Placard({ code, title, note }: { code: string; title: string; note: string }) {
+/** Empty and error states. */
+function Placard({ title, note }: { title: string; note: string }) {
   return (
-    <div className="flex flex-col items-center justify-center border border-dashed border-border py-24 text-center">
-      <span className="font-display text-6xl font-extrabold leading-none text-stroke">{code}</span>
-      <p className="mt-5 font-display text-xl font-extrabold uppercase tracking-tight text-bone">
-        {title}
-      </p>
-      <p className="mt-2 max-w-sm font-mono text-[11px] leading-relaxed text-muted-foreground">
-        {note}
-      </p>
+    <div className="glass flex flex-col items-center rounded-2xl px-6 py-20 text-center">
+      <Film size={36} className="text-white/40" />
+      <p className="mt-5 text-xl font-semibold text-white">{title}</p>
+      <p className="mt-2 max-w-sm text-sm text-white/60">{note}</p>
+    </div>
+  );
+}
+
+function Grid({ items, isLoading, isError }: { items?: Movie[]; isLoading: boolean; isError: boolean }) {
+  if (isError)
+    return <Placard title="Couldn't load this catalogue" note="TMDB did not answer. Try again in a moment." />;
+  if (isLoading)
+    return (
+      <div className={POSTER_GRID}>
+        {Array.from({ length: 18 }).map((_, i) => (
+          <div key={i} className="aspect-[2/3] animate-pulse rounded-lg bg-card" />
+        ))}
+      </div>
+    );
+  if (!items?.length) return <Placard title="Nothing here yet" note="No titles in this category right now." />;
+  return (
+    <div className={POSTER_GRID}>
+      {items.map((item) => (
+        <PosterCard key={`${item.id}`} item={item} />
+      ))}
+    </div>
+  );
+}
+
+/** Pill toggle, the filter idiom used across the app. */
+function Pills<T extends string>({ value, options, onChange }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
+  return (
+    <div className="glass flex rounded-full p-1" role="tablist">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          role="tab"
+          aria-selected={value === o.value}
+          onClick={() => onChange(o.value)}
+          className={`rounded-full px-5 py-2 text-sm font-medium transition-colors ${
+            value === o.value ? "bg-white text-black" : "text-white/60 hover:text-white focus-visible:text-white"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** One streaming service's catalogue, movies or series. */
+function ServiceCatalogue({ serviceId }: { serviceId: number }) {
+  const [type, setType] = useState<"movie" | "tv">("movie");
+  const { data: services } = useQuery({
+    queryKey: ["streaming-services"],
+    queryFn: getStreamingServices,
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+  const name = services?.find((s) => s.provider_id === serviceId)?.provider_name ?? "Service";
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["service-titles", serviceId, type],
+    queryFn: () => getServiceTitles(serviceId, type),
+  });
+
+  return (
+    <div className="space-y-8">
+      <PageHeader
+        title={name}
+        aside={
+          <Pills<"movie" | "tv">
+            value={type}
+            onChange={setType}
+            options={[
+              { value: "movie", label: "Movies" },
+              { value: "tv", label: "Series" },
+            ]}
+          />
+        }
+      />
+      <Grid items={data?.results} isLoading={isLoading} isError={isError} />
     </div>
   );
 }
 
 export default function BrowsePage() {
-  const { category } = useParams<{ category: string }>();
-  const config = category ? CATEGORY_CONFIG[category] : undefined;
+  const { category = "" } = useParams<{ category: string }>();
+  const serviceId = /^service-(\d+)$/.exec(category)?.[1];
+  const config = CATEGORY_CONFIG[category];
 
   const { data, isLoading, isError } = useQuery({
     queryKey: [config?.queryKey ?? "browse", category],
@@ -61,15 +127,13 @@ export default function BrowsePage() {
     enabled: !!config,
   });
 
+  if (serviceId) return <ServiceCatalogue key={serviceId} serviceId={Number(serviceId)} />;
+
   if (!config) {
     return (
       <div className="space-y-8">
-        <PageHeader kicker="Catalogue" title={category ?? "Unknown"} />
-        <Placard
-          code="00"
-          title="Coming Soon"
-          note="This reel hasn't been threaded through the projector yet. Check back for the next screening."
-        />
+        <PageHeader title="Coming soon" />
+        <Placard title="Not available yet" note="This section isn't ready. Check back soon." />
       </div>
     );
   }
@@ -79,52 +143,10 @@ export default function BrowsePage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        kicker="Catalogue"
         title={config.label}
-        aside={
-          count > 0 ? (
-            <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
-              {String(count).padStart(3, "0")} TITLES
-            </span>
-          ) : undefined
-        }
+        aside={count > 0 ? <span className="text-sm text-white/50">{count} titles</span> : undefined}
       />
-
-      {isError ? (
-        <Placard
-          code="404"
-          title="Reel Jammed"
-          note="Could not fetch this catalogue from TMDB. Give the projectionist a moment and try again."
-        />
-      ) : isLoading ? (
-        <div className={GRID}>
-          {Array.from({ length: 18 }).map((_, i) => (
-            <div
-              key={i}
-              className="aspect-[2/3] animate-pulse border border-border bg-card"
-              style={{ animationDelay: `${i * 40}ms` }}
-            />
-          ))}
-        </div>
-      ) : count > 0 ? (
-        <div className={GRID}>
-          {data!.results.map((item, i) => (
-            <div
-              key={item.id}
-              className="reveal"
-              style={{ animationDelay: `${Math.min(i * 28, 500)}ms` }}
-            >
-              <PosterCard item={item} rank={i + 1} />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <Placard
-          code="—"
-          title="Empty House"
-          note="No titles are screening in this category right now."
-        />
-      )}
+      <Grid items={data?.results} isLoading={isLoading} isError={isError} />
     </div>
   );
 }

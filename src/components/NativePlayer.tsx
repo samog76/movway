@@ -63,7 +63,7 @@ function Key({
     >
       {children}
       {wide && (
-        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em]">{label}</span>
+        <span className="text-xs font-bold">{label}</span>
       )}
     </button>
   );
@@ -304,7 +304,7 @@ export default function NativePlayer({
         className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink via-ink/85 to-transparent pt-12 transition-opacity duration-300 ${chrome}`}
       >
         <div className="flex items-center gap-3 px-3">
-          <span className="font-mono text-[11px] tabular-nums text-acid">
+          <span className="text-[13px] tabular-nums text-acid">
             {formatTime(position)}
           </span>
           {/* A range input on purpose: lib/tv.ts hands arrow keys straight to
@@ -320,7 +320,7 @@ export default function NativePlayer({
             disabled={!duration}
             aria-label="Seek"
           />
-          <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+          <span className="text-[13px] tabular-nums text-muted-foreground">
             {duration ? formatTime(duration) : "--:--"}
           </span>
         </div>
@@ -355,7 +355,7 @@ export default function NativePlayer({
           <span className="ml-auto flex items-center gap-0.5">
             {sources.length > 1 && (
               <Key label={source.quality || "Quality"} onClick={cycleQuality} wide>
-                <span className="font-mono text-[10px]">HD</span>
+                <span className="text-xs">HD</span>
               </Key>
             )}
             {vttSubtitles.length > 0 && (

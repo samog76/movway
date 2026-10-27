@@ -14,9 +14,12 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ['Bricolage Grotesque', 'Arial Black', 'sans-serif'],
-        body: ['Manrope', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'ui-monospace', 'SF Mono', 'monospace'],
+        // One family throughout. `mono` stays mapped so data such as times
+        // and counts keep their tabular figures without a typewriter face.
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        display: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        body: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        mono: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
       },
       colors: {
         acid: "hsl(var(--acid))",
@@ -74,6 +77,10 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       keyframes: {
+        "hero-fade": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
         "accordion-down": {
           from: {
             height: "0",
@@ -94,7 +101,7 @@ export default {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "beam-drift": "beam-drift 14s ease-in-out infinite",
+        "hero-fade": "hero-fade 0.7s ease-out",
       },
     },
   },

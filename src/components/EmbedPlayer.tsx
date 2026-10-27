@@ -133,26 +133,26 @@ export default function EmbedPlayer({
       <button
         type="button"
         onClick={() => void toggleFullscreen()}
-        className="absolute right-2 top-2 z-10 inline-flex items-center gap-1 border border-border bg-ink/80 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-bone transition-colors hover:border-acid hover:bg-acid hover:text-ink focus-visible:border-acid focus-visible:bg-acid focus-visible:text-ink"
+        className="glass absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition-colors hover:bg-white hover:text-black focus-visible:bg-white focus-visible:text-black"
         aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
         title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
       >
-        {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+        {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
       </button>
 
       {waiting && (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ink/70">
-          <Loader2 className="h-9 w-9 animate-spin text-acid" />
-          <span className="kicker text-bone">Starting</span>
+          <Loader2 className="h-9 w-9 animate-spin text-white" />
+          <span className="text-sm font-medium text-white/80">Starting</span>
         </div>
       )}
 
       {notResponding && lastResort && (
-        <div className="absolute inset-x-0 bottom-[26%] mx-auto max-w-lg border border-flare/50 bg-ink/95 px-4 py-3 text-center">
-          <span className="kicker text-flare">{provider.name} is not responding</span>
-          <p className="mt-1.5 font-mono text-[11px] leading-relaxed text-bone">
+        <div className="glass absolute inset-x-4 bottom-[26%] mx-auto max-w-lg rounded-2xl px-5 py-4 text-center">
+          <span className="text-sm font-semibold text-red-300">{provider.name} is not responding</span>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-bone">
             It usually means the source is refusing this network. Open{" "}
-            <span className="text-acid">{provider.origin.replace("https://", "")}</span> in a
+            <span className="font-semibold text-white">{provider.origin.replace("https://", "")}</span> in a
             browser tab, pass its check, then come back — it cannot be cleared from inside the
             player.
           </p>

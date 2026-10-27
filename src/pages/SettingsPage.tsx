@@ -45,13 +45,13 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader kicker="Setup" title="Settings" />
+      <PageHeader title="Settings" />
 
       <UpdatePanel />
 
-      <section className="reveal max-w-3xl space-y-4 border border-border bg-card p-5">
+      <section className="glass max-w-3xl space-y-4 rounded-2xl p-6">
         <div>
-          <h2 className="font-display text-lg font-extrabold uppercase tracking-tight text-bone">
+          <h2 className="text-xl font-semibold text-white">
             Streaming backend
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
@@ -62,17 +62,15 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        <label className="flex max-w-xl items-stretch border-2 border-border transition-colors focus-within:border-acid">
-          <span className="flex items-center bg-secondary px-3 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-            Address
-          </span>
+        <label className="flex max-w-xl items-center gap-3 rounded-full border border-white/10 bg-black/30 px-5 transition-shadow focus-within:ring-2 focus-within:ring-white/70">
+          <span className="text-sm font-medium text-white/50">Address</span>
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder="https://cinepro-core.onrender.com"
             spellCheck={false}
             autoCapitalize="none"
-            className="min-w-0 flex-1 bg-card px-3 py-2.5 font-mono text-xs text-bone placeholder:text-muted-foreground/60 focus:outline-none"
+            className="min-w-0 flex-1 bg-transparent py-3 text-sm text-white placeholder:text-white/35 focus:outline-none"
           />
         </label>
 
@@ -80,22 +78,22 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={save}
-            className="border-2 border-acid bg-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-ink transition-transform hover:-translate-y-0.5 focus-visible:-translate-y-0.5"
+            className="btn-play h-11 px-6 text-[15px]"
           >
             Save
           </button>
           <button
             type="button"
             onClick={() => void test()}
-            className="border-2 border-border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-bone transition-colors hover:border-acid focus-visible:border-acid"
+            className="btn-glass h-11 px-5 text-[15px] font-medium"
           >
             Test connection
           </button>
-          {saved && <span className="kicker text-acid">Saved</span>}
+          {saved && <span className="text-sm font-medium text-emerald-400">Saved</span>}
         </div>
 
         {value.trim().length > 0 && !isReachableFromPackagedApp(value) && (
-          <p className="border border-flare/40 bg-flare/5 px-3 py-2 font-mono text-[10px] leading-relaxed text-flare">
+          <p className="rounded-xl border border-flare/40 bg-flare/10 px-4 py-3 text-sm leading-relaxed text-red-200">
             This works in a browser but not in the TV app: it serves itself over https, and an
             http address is blocked before the request is made. Host the backend behind https —
             a Render deploy gives you one.
@@ -103,22 +101,22 @@ export default function SettingsPage() {
         )}
 
         {check.state === "checking" && (
-          <p className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+          <p className="flex items-center gap-2 text-sm text-white/60">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Contacting {normaliseBackendUrl(value)}…
           </p>
         )}
         {check.state === "ok" && (
-          <p className="flex items-center gap-2 font-mono text-[11px] text-acid">
+          <p className="flex items-center gap-2 text-sm text-emerald-400">
             <CheckCircle2 className="h-3.5 w-3.5" /> {check.name} · {check.version}
           </p>
         )}
         {check.state === "failed" && (
-          <p className="flex items-center gap-2 font-mono text-[11px] text-flare">
+          <p className="flex items-center gap-2 text-sm text-red-300">
             <XCircle className="h-3.5 w-3.5" /> {check.reason}
           </p>
         )}
 
-        <p className="border-t border-border pt-3 font-mono text-[10px] leading-relaxed text-muted-foreground/70">
+        <p className="border-t border-white/10 pt-4 text-xs leading-relaxed text-white/45">
           Runs on your own machine, home server or a host like Render — see docs.cinepro.cc. It
           must be reachable from this device over https, and CinePro Core is licensed for
           personal use only.

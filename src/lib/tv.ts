@@ -102,6 +102,24 @@ function zoneOf(el: HTMLElement): string {
  * start, so element-level geometry claims the content is "behind" you and every
  * crossing is refused. The containers still say plainly which side is which.
  */
+/**
+ * Zones pinned along the top edge, marked `data-focus-edge="top"` — the glass
+ * navigation bar. They are the mirror image of the rail: you reach one by
+ * pressing up from the top of the page and leave it by pressing down, and left
+ * or right never carries you in or out. A top bar is `fixed`, so mid-page it
+ * still sits geometrically "above" every control on screen; letting plain
+ * geometry decide would throw the remote into the menu from any row whose
+ * neighbour above had scrolled out of view.
+ */
+function topZones(): Set<string> {
+  const set = new Set<string>();
+  for (const el of document.querySelectorAll<HTMLElement>('[data-focus-edge="top"][data-focus-zone]')) {
+    const name = el.getAttribute("data-focus-zone");
+    if (name) set.add(name);
+  }
+  return set;
+}
+
 function zoneRects(): Map<string, DOMRect> {
   const map = new Map<string, DOMRect>();
   for (const el of document.querySelectorAll<HTMLElement>("[data-focus-zone]")) {
@@ -220,11 +238,53 @@ function move(dir: Direction): boolean {
     return best;
   };
 
-  // Up and down stay inside the zone, full stop. Running out of page is a real
-  // answer — it means you are at the end of it — and is far better than being
-  // thrown into the menu mid-scroll.
+  const tops = topZones();
+  const fromTop = tops.has(fromZone);
+
+  /**
+   * The one vertical crossing: up out of the top of the page into the bar, or
+   * down out of the bar into whatever content is on screen beneath it.
+   */
+  const crossVertical = (): HTMLElement | null => {
+    // Into the bar, land on the section you are in — the way a TV menu
+    // opens on the current tab rather than on whatever happens to be nearest.
+    if (dir === "up") {
+      const current = all.find((c) => tops.has(c.zone) && c.el.getAttribute("aria-current") === "page");
+      if (current) return current.el;
+    } else {
+      // Out of the bar, return to the page's own landing control — Play, the
+      // player — when it is on screen, rather than whatever sits under the tab.
+      const home = all.find(
+        (c) =>
+          !tops.has(c.zone) &&
+          c.el.hasAttribute("data-tv-autofocus") &&
+          c.rect.top >= from.bottom &&
+          c.rect.bottom <= window.innerHeight
+      );
+      if (home) return home.el;
+    }
+    let best: HTMLElement | null = null;
+    let bestCost = Infinity;
+    for (const { el, rect, zone } of all) {
+      if (zone === fromZone) continue;
+      if (dir === "up" ? !tops.has(zone) : tops.has(zone) || zone === "rail") continue;
+      const c = cost(from, rect, dir, false);
+      if (c === null || c >= bestCost) continue;
+      bestCost = c;
+      best = el;
+    }
+    return best;
+  };
+
+  // Up and down stay inside the zone. Running out of page is a real answer —
+  // it means you are at the end of it — and is far better than being thrown
+  // into a side menu mid-scroll. The exception is the top bar: up from the
+  // first row of a page enters it, and down from it returns to the page.
   if (dir === "up" || dir === "down") {
-    const target = pick(false, true);
+    let target = pick(false, true);
+    if (!target && ((dir === "up" && !fromTop && zoneOf(active) !== "rail") || (dir === "down" && fromTop))) {
+      target = crossVertical();
+    }
     if (!target) return false;
     reveal(target);
     return true;
@@ -244,7 +304,7 @@ function move(dir: Direction): boolean {
     let best: HTMLElement | null = null;
     let bestCost = Infinity;
     for (const { el, rect, zone } of all) {
-      if (zone === fromZone) continue;
+      if (zone === fromZone || tops.has(zone)) continue;
       const there = rects.get(zone);
       if (!there) continue;
       const thereCentre = (there.left + there.right) / 2;
@@ -260,7 +320,7 @@ function move(dir: Direction): boolean {
 
   // Left and right prefer the current zone, then cross. That crossing is the
   // only way in and out of the rail, which is what makes it feel deliberate.
-  const target = pick(true, true) ?? pick(false, true) ?? crossZone();
+  const target = pick(true, true) ?? pick(false, true) ?? (fromTop ? null : crossZone());
   if (!target) return false;
   reveal(target);
   return true;
@@ -404,9 +464,9 @@ export function focusFirstInMain(): boolean {
     // it to the player rather than the back link above it.
     usable.find((c) => c.zone === "main" && c.el.hasAttribute("data-tv-autofocus")) ??
     usable.find((c) => c.zone === "main") ??
-    usable.find((c) => c.zone !== "rail");
+    usable.find((c) => c.zone !== "rail" && !topZones().has(c.zone));
 
-  // Deliberately no fall back to the rail. Early in a route the content has
+  // Deliberately no fall back to the rail or the top bar. Early in a route the content has
   // often not rendered, and seeding into the menu at that moment is why the
   // remote could start out in the sidebar with the page unreachable until you
   // had walked the whole way down it.
